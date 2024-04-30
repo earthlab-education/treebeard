@@ -1,57 +1,55 @@
 ```mermaid
 gantt
-    title QGIS Plugin Development Process
-    
+    dateFormat  YYYY-MM-DD
+    title Treebeard Plugin Development Process
+
     section Project Planning
     Define Objectives             :done,    obj, 2024-01-01, 7d
-    - Define Spatial Metrics      :done,    obj1, after obj, 1d
-    - Define Data Needs           :done,    obj2, after obj, 1d
-    Technical Specifications      :active,  specs, after obj, 7d
-    - Software Requirements       :         specs1, after specs, 1d
-    - Hardware Requirements       :         specs2, start specs1, 1d
-    Tool and Data Requirements    :         req, after specs2, 7d
-    - Data Format Specifications  :         req1, after req, 1d
-    - Tool Compatibility Checks   :         req2, start req1, 1d
+    Define Spatial Metrics        :crit,    obj1, after obj, 1d
+    Define Data Needs             :crit,    obj2, after obj, 1d
+    Technical Specifications      :         spec, after obj, 7d
+    Software Requirements         :crit,    sr1, after spec, 3d
+    Hardware Requirements         :crit,    hr1, after spec, 3d
 
     section Data Acquisition and Preparation
-    Data Sourcing                 :         datasrc, after req2, 14d
-    - Acquire Aerial Imagery      :         datasrc1, after datasrc, 7d
-    - Acquire LiDAR Data          :         datasrc2, start datasrc1, 7d
-    Data Preparation              :         dataprep, after datasrc1, 21d
-    - Preprocess Imagery          :         dataprep1, after dataprep, 7d
-    - Preprocess LiDAR            :         dataprep2, start dataprep1, 7d
+    Data Sourcing                 :         ds, after spec, 14d
+    Acquire Aerial Imagery        :crit,    ai, after ds, 7d
+    Acquire LiDAR Data            :crit,    ld, after ds, 7d
+    Data Preparation              :         dp, after ai, 21d
+    Preprocess Imagery            :crit,    pi, after dp, 10d
+    Preprocess LiDAR              :crit,    pl, after dp, 10d
 
     section Algorithm Development
-    Clustering Algorithm Enhancement :      algdev, after dataprep2, 21d
-    - Refine Open Space Algorithm :         algdev1, after algdev, 7d
-    - Integrate Clustering Algorithms :     algdev2, start algdev1, 7d
-    Statistical Analysis Tools    :         stattools, after algdev1, 21d
-    - Develop Variance Metrics    :         stattools1, after stattools, 7d
-    - Develop Fragmentation Indices :       stattools2, start stattools1, 7d
-    
+    Clustering Algorithm Enhancement :      algdev, after pl, 20d
+    Refine Open Space Algorithm   :crit,    rosa, after algdev, 10d
+    Integrate Clustering Algorithms:crit,    ica, after algdev, 10d
+    Statistical Analysis Tools    :         sat, after rosa, 15d
+    Develop Variance Metrics      :crit,    dvm, after sat, 7d
+    Develop Fragmentation Indices :crit,    dfi, after sat, 7d
+
     section Plugin Development
-    Interface Design              :         intdes, after stattools2, 14d
-    - Design User Interface       :         intdes1, after intdes, 7d
-    - Design Settings Panel       :         intdes2, start intdes1, 7d
-    Coding and Integration        :         coding, after intdes1, 21d
-    - Implement Interface         :         coding1, after coding, 7d
-    - Integrate Backend           :         coding2, start coding1, 7d
+    Interface Design              :         id, after dfi, 14d
+    Design User Interface         :crit,    dui, after id, 7d
+    Design Settings Panel         :crit,    dsp, after id, 7d
+    Coding and Integration        :         ci, after dui, 21d
+    Implement Interface           :crit,    ii, after ci, 10d
+    Integrate Backend             :crit,    ib, after ci, 10d
 
     section Testing and Optimization
-    Unit Testing                  :         unittest, after coding2, 14d
-    - Test Data Loading           :         unittest1, after unittest, 7d
-    - Test Clustering Efficiency  :         unittest2, start unittest1, 7d
-    System Testing                :         systest, after unittest1, 14d
-    Performance Tuning            :         perftune, after systest, 14d
-    
+    Unit Testing                  :         ut, after ib, 14d
+    Test Data Loading             :crit,    tdl, after ut, 7d
+    Test Clustering Efficiency    :crit,    tce, after ut, 7d
+    System Testing                :         st, after tdl, 14d
+    Performance Tuning            :         pt, after st, 14d
+
     section Documentation and Training
-    User Manual                   :         userman, after perftune, 14d
-    Training Materials            :         trainmat, after userman, 14d
-    - Create User Tutorials       :         trainmat1, after trainmat, 7d
-    - Create Example Projects     :         trainmat2, start trainmat1, 7d
-    
+    User Manual                   :         um, after pt, 14d
+    Training Materials            :         tm, after um, 14d
+    Create User Tutorials         :crit,    cut, after tm, 7d
+    Create Example Projects       :crit,    cep, after tm, 7d
+
     section Release and Maintenance
-    Deployment                    :         deploy, after trainmat1, 7d
-    Ongoing Support               :         support, after deploy, ongoing
+    Deployment                    :         dep, after cep, 7d
+    Ongoing Support               :         os, after dep, 30d
 
 ```
