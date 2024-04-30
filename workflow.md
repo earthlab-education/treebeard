@@ -7,8 +7,8 @@ gantt
     - Define Spatial Metrics      :done,    obj1, after obj, 1d
     - Define Data Needs           :done,    obj2, after obj, 1d
     Technical Specifications      :active,  specs, after obj, 7d
-    - Software Requirements       :active,  specs1, after specs, 1d
-    - Hardware Requirements       :active,  specs2, start specs1, 1d
+    - Software Requirements       :         specs1, after specs, 1d
+    - Hardware Requirements       :         specs2, start specs1, 1d
     Tool and Data Requirements    :         req, after specs2, 7d
     - Data Format Specifications  :         req1, after req, 1d
     - Tool Compatibility Checks   :         req2, start req1, 1d
