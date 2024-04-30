@@ -1,3 +1,4 @@
+```mermaid
 gantt
     title QGIS Plugin Development Process
     
@@ -52,3 +53,4 @@ gantt
     section Release and Maintenance
     Deployment                    :         deploy, after trainmat, 1w
     Ongoing Support               :         support, after deploy, ongoing
+```
