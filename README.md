@@ -16,4 +16,4 @@ pip install git+https://github.com/earthlab/earthpy@apppears
 ### Install LASTools
 
 Install LASTools at [https://rapidlasso.de/downloads/](https://rapidlasso.de/downloads/)  
-_Note: With Windows/Linux support only_
+(Note: With Windows/Linux support only)
