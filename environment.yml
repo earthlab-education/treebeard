@@ -1,0 +1,78 @@
+name: earth-analytics-python
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pip
+  
+  # Core scientific python
+  - numpy
+  - pyqt
+  - tqdm
+  - kiwisolver
+  
+  # ML
+  - scikit-learn
+  
+  # Plotting
+  - matplotlib
+  - plotly
+  - seaborn
+  - hvplot
+  - geoviews>=1.10
+  - selenium
+  - phantomjs
+  - jupyter_bokeh
+
+  # Spatial packages
+  - pysal
+  - pyproj>=3.0
+  - rasterstats
+  - geopy
+  - cartopy
+  - descartes
+  - contextily
+  - folium
+  - geojson
+  - mapboxgl
+  - hydrofunctions
+  - geocoder
+  - tweepy
+  - xarray
+  - rioxarray>=0.3.0
+  - h5py
+  - scipy
+  - netcdf4
+  - nc-time-axis
+  - regionmask
+  - pyogrio
+
+  # Natural language processing
+  - nltk
+  - textblob
+
+  # Jupyter Environment
+  - papermill
+  - jupyterlab
+  - notebook
+  - ipython
+  - nbclean
+  - nbresuse
+
+  # Textbook Format
+  - jupyter-book
+  - sphinx-exercise
+  - ghp-import
+  
+  # QA
+  - flake8
+  - flake8-import-order
+  - black
+  - autopep8
+  - pydocstyle
+  - nbqa
+  
+  # Autograding
+  - nbgrader
