@@ -26,6 +26,8 @@ dependencies:
   - selenium
   - phantomjs
   - jupyter_bokeh
+  - firefox
+  - geckodriver
 
   # Spatial packages
   - pysal
