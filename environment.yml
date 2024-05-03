@@ -1,4 +1,4 @@
-name: earth-analytics-python
+name: treebeard
 channels:
   - conda-forge
   - defaults
