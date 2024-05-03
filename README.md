@@ -4,13 +4,18 @@
 
 ## How to Run
 
-### Set up Environment
+### Set up Environment (First Time)
 ```
 conda activate base
 conda install -c conda-forge mamba
 mamba env create -f environment.yml
 conda activate treebeard
 pip install git+https://github.com/earthlab/earthpy@apppears
+```
+
+### Update Environment
+```
+mamba env update -f environment.yml
 ```
 
 ### Install LASTools

@@ -15,6 +15,7 @@ dependencies:
   
   # ML
   - scikit-learn
+  - scikit-fuzzy
   
   # Plotting
   - matplotlib
