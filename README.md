@@ -10,7 +10,6 @@ conda activate base
 conda install -c conda-forge mamba
 mamba env create -f environment.yml
 conda activate treebeard
-pip install git+https://github.com/earthlab/earthpy@apppears
 ```
 
 ### Update Environment
