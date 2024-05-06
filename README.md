@@ -14,6 +14,7 @@ conda activate treebeard
 
 ### Update Environment
 ```
+conda activate treebeard
 mamba env update -f environment.yml
 ```
 
