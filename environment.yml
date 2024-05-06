@@ -79,3 +79,9 @@ dependencies:
   
   # Autograding
   - nbgrader
+
+  # leafmap segment anything
+  - leafmap
+  - segment-geospatial
+  - localtileserver
+  - flask<3.0.0
