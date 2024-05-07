@@ -27,9 +27,13 @@ dependencies:
   - phantomjs
   - jupyter_bokeh
   - firefox
+  - cartopy
   - geckodriver
 
   # Spatial packages
+  - earthpy
+  - laspy
+  - pdal
   - pysal
   - pyproj>=3.0
   - rasterstats
