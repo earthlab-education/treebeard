@@ -6,6 +6,22 @@ TreeBeard is an open-source GIS plugin designed to automate the classification a
 
 ## How to Run
 
+### Important Note Regarding PDAL
+
+This process requires PDAL (Point Data Abstraction Library) to be installed on the environment. This requires some extra steps beyond normal library installation:
+
+* Install Visual Studio Build Tools:
+
+* https://visualstudio.microsoft.com/visual-cpp-build-tools/
+
+* run pip install pdal
+
+* It may also be necessary to install cmake build tools from here:
+
+* https://cmake.org/download/
+
+(Still working on a solution for MacOS)
+
 ### Set up Environment (First Time)
 ```
 conda activate base
