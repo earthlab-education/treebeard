@@ -35,8 +35,3 @@ conda activate treebeard
 conda activate treebeard
 mamba env update -f environment.yml
 ```
-
-### Install LASTools
-
-Install LASTools at [https://rapidlasso.de/downloads/](https://rapidlasso.de/downloads/)  
-(Note: With Windows/Linux support only)
