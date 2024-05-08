@@ -55,6 +55,7 @@ dependencies:
   - nc-time-axis
   - regionmask
   - pyogrio
+  - xarray-spatial
 
   # Natural language processing
   - nltk
