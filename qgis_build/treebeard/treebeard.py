@@ -31,6 +31,16 @@ from .resources import *
 from .treebeard_dialog import treebeardDialog
 import os.path
 
+import sys
+import os
+
+# Get the directory of the current file
+plugin_dir = os.path.dirname(__file__)
+
+# Add the extlibs directory to the sys.path
+extlibs_path = os.path.join(plugin_dir, 'extlibs')
+if extlibs_path not in sys.path:
+    sys.path.insert(0, extlibs_path)
 
 class treebeard:
     """QGIS Plugin Implementation."""
