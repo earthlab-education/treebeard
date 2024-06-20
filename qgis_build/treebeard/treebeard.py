@@ -34,6 +34,13 @@ import os.path
 import sys
 import os
 
+import fiona
+import geopandas as gpd
+import numpy as np
+import rasterio
+from sklearn.cluster import KMeans
+import shapely
+
 # Get the directory of the current file
 plugin_dir = os.path.dirname(__file__)
 

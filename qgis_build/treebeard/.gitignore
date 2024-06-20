@@ -1,0 +1,27 @@
+.DS_Store
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+profile_default/
+ipython_config.py
+
+# Ignore Python bytecode files
+*.pyc
+__pycache__/
+
+# Ignore environment configuration
+.env
+
+# Ignore extlibs directory
+extlibs/
+
+# Ignore other dependencies
+*.egg-info/
+*.egg
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore temporary files
+*.swp
+*.tmp
