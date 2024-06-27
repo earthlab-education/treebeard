@@ -5,6 +5,9 @@ REM Get the directory where the batch file is located (the dev folder)
 set "DEV_DIR=%~dp0"
 set "PLUGIN_DIR=%USERPROFILE%\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\treebeard"
 
+if "%DEV_DIR:~-1%"=="\" set "DEV_DIR=%DEV_DIR:~0,-1%"
+
+
 REM Specify the file to sync
 set "FILENAME=treebeard.py"
 
