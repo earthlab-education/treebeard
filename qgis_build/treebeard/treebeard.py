@@ -10,12 +10,12 @@ if extlibs_path not in sys.path:
     sys.path.insert(0, extlibs_path)
 
 # Now you can import your dependencies as usual
-import fiona
-import geopandas as gpd
-import numpy as np
-import rasterio
+# import fiona
+# import geopandas as gpd
+# import numpy as np
+# import rasterio
 from sklearn.cluster import KMeans
-import shapely
+# import shapely
 
 from qgis.PyQt.QtWidgets import QAction, QFileDialog, QMessageBox, QDialog
 from qgis.PyQt.QtGui import QIcon
@@ -53,66 +53,66 @@ class TreebeardDialog(QDialog, Ui_TreebeardDialog):
         if self.polygon_path:
             self.polygonLineEdit.setText(self.polygon_path)
 
-    def process_files(self):
-        """
-        Process the selected files.
-        """
-        if not self.raster_path or not self.polygon_path:
-            QMessageBox.critical(self, "Error", "Please select both raster and polygon files.")
-            return
+    # def process_files(self):
+    #     """
+    #     Process the selected files.
+    #     """
+    #     if not self.raster_path or not self.polygon_path:
+    #         QMessageBox.critical(self, "Error", "Please select both raster and polygon files.")
+    #         return
 
-        try:
-            cluster_labels, profile = self.kmeans_clustering(self.raster_path, n_clusters=4)
-            gdf_clusters = self.clusters_to_polygons(cluster_labels, profile, self.polygon_path)
-            self.load_polygons_to_qgis(gdf_clusters, "Clustered Polygons")
-            self.calculate_spatial_statistics(gdf_clusters)
-            QMessageBox.information(self, "Success", "Processing complete.")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+    #     try:
+    #         cluster_labels, profile = self.kmeans_clustering(self.raster_path, n_clusters=4)
+    #         gdf_clusters = self.clusters_to_polygons(cluster_labels, profile, self.polygon_path)
+    #         self.load_polygons_to_qgis(gdf_clusters, "Clustered Polygons")
+    #         self.calculate_spatial_statistics(gdf_clusters)
+    #         QMessageBox.information(self, "Success", "Processing complete.")
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Error", str(e))
 
-    def kmeans_clustering(self, raster_path, n_clusters=4):
-        """
-        Perform k-means clustering on the raster file.
-        :param raster_path: Path to the raster file.
-        :param n_clusters: Number of clusters.
-        :return: Cluster labels and raster profile.
-        """
-        with rasterio.open(raster_path) as src:
-            bands = [src.read(i) for i in range(1, src.count + 1)]
-            image_data = np.dstack(bands)
+    # def kmeans_clustering(self, raster_path, n_clusters=4):
+    #     """
+    #     Perform k-means clustering on the raster file.
+    #     :param raster_path: Path to the raster file.
+    #     :param n_clusters: Number of clusters.
+    #     :return: Cluster labels and raster profile.
+    #     """
+    #     with rasterio.open(raster_path) as src:
+    #         bands = [src.read(i) for i in range(1, src.count + 1)]
+    #         image_data = np.dstack(bands)
 
-        pixels = image_data.reshape((-1, image_data.shape[2]))
-        kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=10)
-        kmeans.fit(pixels)
-        labels = kmeans.labels_.reshape(image_data.shape[:2])
+    #     pixels = image_data.reshape((-1, image_data.shape[2]))
+    #     kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=10)
+    #     kmeans.fit(pixels)
+    #     labels = kmeans.labels_.reshape(image_data.shape[:2])
 
-        return labels, src.profile
+    #     return labels, src.profile
 
-    def clusters_to_polygons(self, cluster_labels, profile, polygon_path):
-        """
-        Convert cluster labels to polygons.
-        :param cluster_labels: Cluster labels from k-means.
-        :param profile: Raster profile.
-        :param polygon_path: Path to the polygon file.
-        :return: GeoDataFrame of clusters.
-        """
-        with fiona.open(polygon_path, "r") as shapefile:
-            shapes_polygon = [feature["geometry"] for feature in shapefile]
+    # def clusters_to_polygons(self, cluster_labels, profile, polygon_path):
+    #     """
+    #     Convert cluster labels to polygons.
+    #     :param cluster_labels: Cluster labels from k-means.
+    #     :param profile: Raster profile.
+    #     :param polygon_path: Path to the polygon file.
+    #     :return: GeoDataFrame of clusters.
+    #     """
+    #     with fiona.open(polygon_path, "r") as shapefile:
+    #         shapes_polygon = [feature["geometry"] for feature in shapefile]
 
-        mask = cluster_labels != 0
-        results = (
-            {'properties': {'cluster': int(v)}, 'geometry': s}
-            for i, (s, v) in enumerate(shapes(cluster_labels, mask=mask, transform=profile['transform']))
-        )
+    #     mask = cluster_labels != 0
+    #     results = (
+    #         {'properties': {'cluster': int(v)}, 'geometry': s}
+    #         for i, (s, v) in enumerate(shapes(cluster_labels, mask=mask, transform=profile['transform']))
+    #     )
 
-        geoms = list(results)
-        gdf_clusters = gpd.GeoDataFrame.from_features(geoms)
-        gdf_clusters.crs = profile['crs']
+    #     geoms = list(results)
+    #     gdf_clusters = gpd.GeoDataFrame.from_features(geoms)
+    #     gdf_clusters.crs = profile['crs']
 
-        gdf_polygons = gpd.read_file(polygon_path)
-        gdf_clusters = gpd.overlay(gdf_clusters, gdf_polygons, how='intersection')
+    #     gdf_polygons = gpd.read_file(polygon_path)
+    #     gdf_clusters = gpd.overlay(gdf_clusters, gdf_polygons, how='intersection')
 
-        return gdf_clusters
+    #     return gdf_clusters
 
     def load_polygons_to_qgis(self, gdf, layer_name='Clustered Polygons'):
         """
