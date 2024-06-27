@@ -14,16 +14,16 @@ if extlibs_path not in sys.path:
 # import geopandas as gpd
 # import numpy as np
 # import rasterio
-from sklearn.cluster import KMeans
+# from sklearn.cluster import KMeans
 # import shapely
 
 from qgis.PyQt.QtWidgets import QAction, QFileDialog, QMessageBox, QDialog
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import QgsProject, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry, QgsVectorDataProvider
 from PyQt5.QtCore import QVariant
-from .ui_treebeard_test import Ui_TreebeardDialog
+from .ui_treebeard_test import Ui_TreebeardDialogBase
 
-class TreebeardDialog(QDialog, Ui_TreebeardDialog):
+class TreebeardDialog(QDialog, Ui_TreebeardDialogBase):
     def __init__(self, parent=None):
         """
         Constructor for the dialog class.
