@@ -64,8 +64,7 @@ class Treebeard:
         dialog.show()
         dialog.exec_()
 
-'''
-class TreebeardDialog(QDialog, treebeardDialog):
+class TreebeardDialog(treebeardDialog):
     def __init__(self, parent=None):
         super(TreebeardDialog, self).__init__(parent)
         self.setupUi(self)
@@ -84,7 +83,7 @@ class TreebeardDialog(QDialog, treebeardDialog):
         self.polygon_path, _ = QFileDialog.getOpenFileName(self, "Select Boundary Polygon File", "", "Vector files (*.shp *.geojson)")
         if self.polygon_path:
             self.polygonLineEdit.setText(self.polygon_path)
-
+'''
     def process_files(self):
         if not self.raster_path or not self.polygon_path:
             QMessageBox.critical(self, "Error", "Please select both raster and polygon files.")
@@ -150,5 +149,4 @@ class TreebeardDialog(QDialog, treebeardDialog):
         stats = gdf['geometry'].area.describe()
         print("Spatial Statistics:")
         print(stats)
-
 '''
