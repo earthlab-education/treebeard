@@ -39,7 +39,7 @@
     <string>Select Raster Set</string>
    </property>
   </widget>
-  <widget class="QLineEdit" name="lineEdit">
+  <widget class="QLineEdit" name="polygonLineEdit">
    <property name="geometry">
     <rect>
      <x>170</x>
@@ -49,7 +49,7 @@
     </rect>
    </property>
   </widget>
-  <widget class="QLineEdit" name="lineEdit_2">
+  <widget class="QLineEdit" name="rasterLineEdit">
    <property name="geometry">
     <rect>
      <x>170</x>
@@ -59,7 +59,7 @@
     </rect>
    </property>
   </widget>
-  <widget class="QPushButton" name="pushButton">
+  <widget class="QPushButton" name="browsePolygonButton">
    <property name="geometry">
     <rect>
      <x>370</x>
@@ -85,7 +85,7 @@
     <string>Browse</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="pushButton_3">
+  <widget class="QPushButton" name="processButton">
    <property name="geometry">
     <rect>
      <x>190</x>

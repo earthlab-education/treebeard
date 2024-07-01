@@ -32,5 +32,5 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :type iface: QgsInterface
     """
     #
-    from .treebeard import treebeard
-    return treebeard(iface)
+    from .treebeard import Treebeard
+    return Treebeard(iface)
