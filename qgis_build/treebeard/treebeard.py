@@ -83,7 +83,7 @@ class TreebeardDialog(treebeardDialog):
         self.polygon_path, _ = QFileDialog.getOpenFileName(self, "Select Boundary Polygon File", "", "Vector files (*.shp *.geojson)")
         if self.polygon_path:
             self.polygonLineEdit.setText(self.polygon_path)
-'''
+
     def process_files(self):
         if not self.raster_path or not self.polygon_path:
             QMessageBox.critical(self, "Error", "Please select both raster and polygon files.")
@@ -98,6 +98,7 @@ class TreebeardDialog(treebeardDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 
+'''
     def kmeans_clustering(self, raster_path, n_clusters=4):
         with rasterio.open(raster_path) as src:
             bands = [src.read(i) for i in range(1, src.count + 1)]

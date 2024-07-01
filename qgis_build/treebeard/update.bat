@@ -7,19 +7,21 @@ set "PLUGIN_DIR=%USERPROFILE%\AppData\Roaming\QGIS\QGIS3\profiles\default\python
 
 if "%DEV_DIR:~-1%"=="\" set "DEV_DIR=%DEV_DIR:~0,-1%"
 
+REM List of files to sync
+set "FILES=treebeard.py treebeard_dialog.py __init__.py treebeard_dialog_base.ui setup.bat setup.sh resources.qrc update.bat"
 
-REM Specify the file to sync
-set "FILENAME=treebeard.py"
-
-REM Debugging output to check paths and file
+REM Debugging output to check paths and files
 echo Development Directory: %DEV_DIR%
 echo Plugin Directory: %PLUGIN_DIR%
-echo File to sync: %FILENAME%
+echo Files to sync: %FILES%
 
-echo Syncing the specified file from development folder to QGIS plugin directory...
+echo Syncing the specified files from development folder to QGIS plugin directory...
 
-REM Use robocopy to copy only the specified file if it has changed
-robocopy "%DEV_DIR%" "%PLUGIN_DIR%" "%FILENAME%" /XO /XC /R:3 /W:10
+REM Iterate over the list of files and sync each one
+for %%F in (%FILES%) do (
+    echo Syncing %%F...
+    robocopy "%DEV_DIR%" "%PLUGIN_DIR%" "%%F" /XO /XC /R:3 /W:10
+)
 
 echo Restart QGIS to see the changes.
 pause
