@@ -9,7 +9,7 @@ IF NOT EXIST extlibs (
 )
 
 REM Install dependencies into extlibs
-pip install fiona geopandas numpy rasterio scikit-learn shapely gdal --target=extlibs
+pip install numpy scikit-learn --target=extlibs
 
 REM Inform the user
 echo Dependencies installed in extlibs directory.
