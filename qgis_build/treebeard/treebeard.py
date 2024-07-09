@@ -6,17 +6,34 @@ from PyQt5.QtCore import QCoreApplication, QVariant
 from .treebeard_dialog import treebeardDialog
 from qgis.core import QgsProject, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry
 
+# Import numpy from QGIS environment
+try:
+    import numpy as np
+except ImportError:
+    raise ImportError("Numpy is not installed in the QGIS Python environment. Please install it using the QGIS Python interpreter.")
+
 # Add the extlibs directory to sys.path
 plugin_dir = os.path.dirname(__file__)
 extlibs_path = os.path.join(plugin_dir, 'extlibs')
 if extlibs_path not in sys.path:
-    sys.path.insert(0, extlibs_path)
+    sys.path.append( extlibs_path)
 
-# import fiona
-# import rasterio
-# import numpy as np
-# from sklearn.cluster import KMeans
-# import geopandas as gpd
+# Remove the folder from its current position in sys.path if it exists
+if extlibs_path in sys.path:
+    sys.path.remove(extlibs_path)
+
+# Append the folder to the end of sys.path
+sys.path.append(extlibs_path)
+
+# Now import other dependencies
+try:
+    # import fiona
+    # import geopandas as gpd
+    # import rasterio
+    from sklearn.cluster import KMeans
+except ImportError as e:
+    raise ImportError(f"An import error occurred: {e}. Ensure all dependencies are installed in the QGIS Python environment.")
+
 
 class Treebeard:
     def __init__(self, iface):
