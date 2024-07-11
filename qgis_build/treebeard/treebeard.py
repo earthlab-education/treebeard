@@ -28,9 +28,9 @@ sys.path.append(extlibs_path)
 # Now import other dependencies
 try:
     # import fiona
-    # import geopandas as gpd
+    import geopandas as gpd
     # import rasterio
-    from sklearn.cluster import KMeans
+    # from sklearn.cluster import KMeans
 except ImportError as e:
     raise ImportError(f"An import error occurred: {e}. Ensure all dependencies are installed in the QGIS Python environment.")
 
@@ -128,7 +128,7 @@ class TreebeardDialog(treebeardDialog):
 
         return labels, src.profile
 
-    def clusters_to_polygons(self, cluster_labels, profile, polygon_path):
+    def cluster_to_poly(self, cluster_labels, profile, polygon_path):
         with fiona.open(polygon_path, "r") as shapefile:
             shapes_polygon = [feature["geometry"] for feature in shapefile]
 
