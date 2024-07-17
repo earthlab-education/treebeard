@@ -2,6 +2,27 @@ import os
 import requests
 import urllib.parse
 import zipfile
+import plotly.express as px
+import plotly.graph_objects as go
+import geopandas as gpd
+from shapely.geometry import MultiPolygon
+
+
+def check_contiguity(gdf: gpd.GeoDataFrame) -> bool:
+    """
+    Check if geometries in a GeoDataFrame are contiguous.
+    
+    Parameters:
+    gdf (GeoDataFrame): GeoDataFrame to check for contiguity.
+
+    Returns:
+    bool: True if all geometries are contiguous, False otherwise.
+    """
+    gdf = gdf.dissolve()
+    is_multipolygon = gdf.geometry.apply(
+        lambda geom: isinstance(geom, MultiPolygon)).all()
+    is_contiguous = not is_multipolygon
+    return is_contiguous
 
 
 def get_filename_from_url(url):
@@ -66,10 +87,62 @@ def save_drapp_shapefile(local_path: str, url=None):
     return shapefilepath
 
 
-def save_drapp_tiles(localpath, tilenames: list):
+def save_drapp_tiles(localpath, tilenames: list, tile_base_url=None):
     os.makedirs(localpath, exist_ok=True)
-    tile_base_url = 'https://drapparchive.s3.amazonaws.com/2020/'
+    if not tile_base_url:
+        tile_base_url = 'https://drapparchive.s3.amazonaws.com/2020/'
     tile_urls = [f'{tile_base_url}{tile}.tif' for tile in tilenames]
     
     tile_paths = download_files(localpath, tile_urls)
     return tile_paths
+
+
+def plot_aoi_bbox_drapp(aoi_gdf, bbox_aoi_gdf, drapp_aoi_gdf):
+    """
+    Generate a Plotly mapbox plot with AOI, BBOX, and DRAPP tiles.
+
+    Parameters:
+    aoi_gdf (GeoDataFrame): GeoDataFrame containing the AOI geometry.
+    bbox_aoi_gdf (GeoDataFrame): GeoDataFrame containing the bounding box geometry.
+    drapp_aoi_gdf (GeoDataFrame): GeoDataFrame containing the DRAPP tile geometries along with photo_date and tile information.
+
+    Returns:
+    fig (Figure): Plotly figure with the map and overlays.
+    """
+    # Add label to AOI GeoDataFrame
+    aoi_gdf['label'] = 'Area of Interest'
+
+    # Create a choropleth mapbox plot for AOI
+    fig = px.choropleth_mapbox(
+        aoi_gdf, 
+        geojson=aoi_gdf.geometry, 
+        locations=aoi_gdf.index, 
+        color='label', 
+        color_discrete_sequence=["red"],
+        mapbox_style="open-street-map",
+        center={"lat": aoi_gdf.centroid.y.mean(), "lon": aoi_gdf.centroid.x.mean()}, 
+        zoom=11
+    )
+
+    # Add DRAPP tiles to the map
+    for idx, row in drapp_aoi_gdf.iterrows():
+        tile_info = f"{row['tile']} {row['photo_date']}"
+        fig.add_trace(go.Scattermapbox(
+            lon=[coord[0] for coord in row.geometry.exterior.coords],
+            lat=[coord[1] for coord in row.geometry.exterior.coords],
+            mode='lines',
+            line=dict(width=2, color='blue'),
+            name=tile_info
+        ))
+
+    # Add bounding box of AOI to the map
+    for idx, row in bbox_aoi_gdf.iterrows():
+        fig.add_trace(go.Scattermapbox(
+            lon=[coord[0] for coord in row.geometry.exterior.coords],
+            lat=[coord[1] for coord in row.geometry.exterior.coords],
+            mode='lines',
+            line=dict(width=2, color='black'),
+            name='Bounding Box'
+        ))
+
+    return fig
