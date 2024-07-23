@@ -52,8 +52,8 @@ def convert_las_to_tif(input_las, output_tif, return_type):
         wbt.lidar_idw_interpolation(
             i=input_las,
             output=output_tif,
-            parameter="classification",
-            classification=2,
+            parameter="return_num",
+            returns=2,
             resolution=1  # Adjust as needed
         )
     else:
