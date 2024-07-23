@@ -1,3 +1,4 @@
+import earthpy.spatial as es
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -9,6 +10,7 @@ from shapely.ops import unary_union
 from skimage import io
 from skimage.segmentation import quickshift
 from sklearn.cluster import KMeans
+from tqdm import tqdm
 
 
 def generate_binary_gdf(tilepath, n_clusters=2):
@@ -26,6 +28,7 @@ def generate_binary_gdf(tilepath, n_clusters=2):
     affine = tile.transform
 
     # Segment the image using quickshift
+    # Quickshift Segmentation: Segment the image using the quickshift algorithm to create superpixels
     img = io.imread(tilepath)
     img = img[:, :, :3]
     segments = quickshift(img, kernel_size=3, convert2lab=False, max_dist=6, ratio=0.5).astype('int32')
@@ -33,13 +36,13 @@ def generate_binary_gdf(tilepath, n_clusters=2):
 
     # Convert segments to vector features
     polys = []
-    for shp, value in shapes(segments, transform=affine):
+    for shp, value in tqdm(shapes(segments, transform=affine), desc="Converting segments to vector features"):
         polys.append(shp)
 
     # Compute mean values for each band in each segment
     bands = np.stack([red, green, blue, nir], axis=-1)
     mean_vals = []
-    for shp in polys:
+    for shp in tqdm(polys, desc="Computing mean values for each band"):
         mask = rasterio.features.geometry_mask([shp], transform=affine, invert=True, out_shape=bands.shape[:2])
         mean_vals.append(bands[mask].mean(axis=0))
 
@@ -61,7 +64,199 @@ def generate_binary_gdf(tilepath, n_clusters=2):
 
     # Dissolve polygons by 'class' to merge connected polygons
     dissolved_gdfs = []
-    for cls in gdf['class'].unique():
+    for cls in tqdm(gdf['class'].unique(), desc="Dissolving polygons by class"):
+        class_gdf = gdf[gdf['class'] == cls]
+        dissolved_gdf = class_gdf.dissolve()
+        dissolved_gdf['class'] = cls
+        dissolved_gdfs.append(dissolved_gdf)
+
+    # Combine the dissolved GeoDataFrames
+    dissolved_gdf = gpd.GeoDataFrame(pd.concat(dissolved_gdfs, ignore_index=True), crs=sr)
+
+    return dissolved_gdf
+
+
+
+    # Load the image and bands
+    tile = rasterio.open(tilepath)
+
+    red = tile.read(1).astype(float)
+    nir = tile.read(4).astype(float)
+
+    # Get image bounding box info
+    sr = tile.crs
+    bounds = tile.bounds
+    affine = tile.transform
+
+    # Compute NDVI
+    ndvi = (nir - red) / (nir + red)
+
+    # Segment the NDVI image using quickshift
+    img = io.imread(tilepath)
+    img_ndvi = np.expand_dims(ndvi, axis=2).astype(np.float32)
+    segments = quickshift(img_ndvi, kernel_size=3, convert2lab=False, max_dist=6, ratio=0.5).astype('int32')
+    print("Quickshift number of segments: %d" % len(np.unique(segments)))
+
+    # Convert segments to vector features
+    polys = []
+    for shp, value in tqdm(shapes(segments, transform=affine), desc="Converting segments to vector features"):
+        polys.append(shp)
+
+    # Compute mean NDVI for each segment
+    mean_ndvi_vals = []
+    for shp in tqdm(polys, desc="Computing mean NDVI values"):
+        mask = rasterio.features.geometry_mask([shp], transform=affine, invert=True, out_shape=ndvi.shape)
+        mean_ndvi_vals.append(ndvi[mask].mean())
+
+    mean_ndvi_vals = np.array(mean_ndvi_vals).reshape(-1, 1)
+
+    # Apply k-means clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(mean_ndvi_vals)
+    labels = kmeans.labels_
+
+    # Create GeoDataFrame with segments and their cluster labels
+    geom = [shape(i) for i in polys]
+    gdf = gpd.GeoDataFrame({'geometry': geom, 'cluster': labels}, crs=sr)
+
+    # Assuming cluster 0 is 'not tree' and cluster 1 is 'tree' (this can vary based on the data)
+    if mean_ndvi_vals[labels == 0].mean() > mean_ndvi_vals[labels == 1].mean():
+        gdf['class'] = gdf['cluster']
+    else:
+        gdf['class'] = 1 - gdf['cluster']
+
+    # Dissolve polygons by 'class' to merge connected polygons
+    dissolved_gdfs = []
+    for cls in tqdm(gdf['class'].unique(), desc="Dissolving polygons by class"):
+        class_gdf = gdf[gdf['class'] == cls]
+        dissolved_gdf = class_gdf.dissolve()
+        dissolved_gdf['class'] = cls
+        dissolved_gdfs.append(dissolved_gdf)
+
+    # Combine the dissolved GeoDataFrames
+    dissolved_gdf = gpd.GeoDataFrame(pd.concat(dissolved_gdfs, ignore_index=True), crs=sr)
+
+    return dissolved_gdf
+
+
+
+    # Load the image and bands
+    tile = rasterio.open(tilepath)
+    red = tile.read(1).astype(float)
+    nir = tile.read(4).astype(float)
+
+    # Get image bounding box info
+    sr = tile.crs
+    bounds = tile.bounds
+    affine = tile.transform
+
+    # Compute NDVI using earthpy.spatial.normalized_diff
+    ndvi = es.normalized_diff(nir, red)
+
+    # Handle NaN values
+    ndvi = np.where(np.isnan(ndvi), 0, ndvi)
+
+    # Segment the NDVI image using quickshift
+    img = io.imread(tilepath)
+    img_ndvi = np.expand_dims(ndvi, axis=2).astype(np.float32)
+    segments = quickshift(img_ndvi, kernel_size=3, convert2lab=False, max_dist=6, ratio=0.5).astype('int32')
+    print("Quickshift number of segments: %d" % len(np.unique(segments)))
+
+    # Convert segments to vector features
+    polys = []
+    for shp, value in tqdm(shapes(segments, transform=affine), desc="Converting segments to vector features"):
+        polys.append(shp)
+
+    # Compute mean NDVI for each segment
+    mean_ndvi_vals = []
+    for shp in tqdm(polys, desc="Computing mean NDVI values"):
+        mask = rasterio.features.geometry_mask([shp], transform=affine, invert=True, out_shape=ndvi.shape)
+        mean_ndvi_vals.append(ndvi[mask].mean())
+
+    mean_ndvi_vals = np.array(mean_ndvi_vals).reshape(-1, 1)
+
+    # Apply k-means clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(mean_ndvi_vals)
+    labels = kmeans.labels_
+
+    # Create GeoDataFrame with segments and their cluster labels
+    geom = [shape(i) for i in polys]
+    gdf = gpd.GeoDataFrame({'geometry': geom, 'cluster': labels}, crs=sr)
+
+    # Assuming cluster 0 is 'not tree' and cluster 1 is 'tree' (this can vary based on the data)
+    if mean_ndvi_vals[labels == 0].mean() > mean_ndvi_vals[labels == 1].mean():
+        gdf['class'] = gdf['cluster']
+    else:
+        gdf['class'] = 1 - gdf['cluster']
+
+    # Dissolve polygons by 'class' to merge connected polygons
+    dissolved_gdfs = []
+    for cls in tqdm(gdf['class'].unique(), desc="Dissolving polygons by class"):
+        class_gdf = gdf[gdf['class'] == cls]
+        dissolved_gdf = class_gdf.dissolve()
+        dissolved_gdf['class'] = cls
+        dissolved_gdfs.append(dissolved_gdf)
+
+    # Combine the dissolved GeoDataFrames
+    dissolved_gdf = gpd.GeoDataFrame(pd.concat(dissolved_gdfs, ignore_index=True), crs=sr)
+
+    return dissolved_gdf
+
+
+def generate_binary_gdf_ndvi(tilepath, n_clusters=2):
+    # Load the image and bands
+    tile = rasterio.open(tilepath)
+    red = tile.read(1).astype(float)
+    nir = tile.read(4).astype(float)
+
+    # Get image bounding box info
+    sr = tile.crs
+    bounds = tile.bounds
+    affine = tile.transform
+
+    # Compute NDVI using earthpy.spatial.normalized_diff
+    ndvi = es.normalized_diff(nir, red)
+
+    # Handle NaN values
+    ndvi = np.where(np.isnan(ndvi), 0, ndvi)
+
+    # Segment the NDVI image using quickshift
+    img = io.imread(tilepath)
+    img_ndvi = np.expand_dims(ndvi, axis=2).astype(np.float32)
+    segments = quickshift(img_ndvi, kernel_size=3, convert2lab=False, max_dist=6, ratio=0.5).astype('int32')
+    print("Quickshift number of segments: %d" % len(np.unique(segments)))
+
+    # Convert segments to vector features
+    polys = []
+    for shp, value in tqdm(shapes(segments, transform=affine), desc="Converting segments to vector features"):
+        polys.append(shp)
+
+    # Compute mean NDVI for each segment
+    mean_ndvi_vals = []
+    for shp in tqdm(polys, desc="Computing mean NDVI values"):
+        mask = rasterio.features.geometry_mask([shp], transform=affine, invert=True, out_shape=ndvi.shape)
+        mean_ndvi_vals.append(ndvi[mask].mean())
+
+    mean_ndvi_vals = np.array(mean_ndvi_vals).reshape(-1, 1)
+
+    # Apply k-means clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(mean_ndvi_vals)
+    labels = kmeans.labels_
+
+    # Create GeoDataFrame with segments and their cluster labels
+    geom = [shape(i) for i in polys]
+    gdf = gpd.GeoDataFrame({'geometry': geom, 'cluster': labels}, crs=sr)
+
+    # Determine which cluster corresponds to 'tree' based on NDVI values
+    cluster_mean_ndvi = [mean_ndvi_vals[labels == i].mean() for i in range(n_clusters)]
+    tree_cluster = np.argmax(cluster_mean_ndvi)
+    not_tree_cluster = 1 - tree_cluster
+
+    # Assign class labels based on the cluster with higher NDVI being 'tree'
+    gdf['class'] = gdf['cluster'].apply(lambda x: 1 if x == tree_cluster else 0)
+
+    # Dissolve polygons by 'class' to merge connected polygons
+    dissolved_gdfs = []
+    for cls in tqdm(gdf['class'].unique(), desc="Dissolving polygons by class"):
         class_gdf = gdf[gdf['class'] == cls]
         dissolved_gdf = class_gdf.dissolve()
         dissolved_gdf['class'] = cls
