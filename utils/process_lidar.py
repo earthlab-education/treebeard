@@ -44,17 +44,19 @@ def convert_las_to_tif(input_las, output_tif, return_type):
         wbt.lidar_idw_interpolation(
             i=input_las,
             output=output_tif,
-            parameter="return_num",
-            returns=1,
-            resolution=1  # Adjust as needed
+            parameter="elevation",
+            returns="first",
+            resolution=1.0,  # Define the resolution as needed
+            radius=3.0     # Define the search radius as needed
         )
     elif return_type == "ground":
         wbt.lidar_idw_interpolation(
             i=input_las,
             output=output_tif,
-            parameter="return_num",
-            returns=2,
-            resolution=1  # Adjust as needed
+            parameter="elevation",
+            returns="ground",
+            resolution=1.0,  # Define the resolution as needed
+            radius=3.0     # Define the search radius as needed
         )
     else:
         raise ValueError("Invalid return_type. Use 'first' or 'ground'.")
