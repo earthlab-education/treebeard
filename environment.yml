@@ -1,0 +1,104 @@
+name: treebeard
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pip
+  
+  # Core scientific python
+  - kiwisolver
+  - numpy
+  - pyqt
+  - tqdm
+
+  # Data Handling
+  - json  # Standard library, included here for completeness
+  - pandas
+  - requests
+  
+  # ML
+  - scikit-fuzzy
+  - scikit-learn
+  
+  # Plotting
+  - cartopy
+  - firefox
+  - geoviews>=1.10
+  - hvplot
+  - jupyter_bokeh
+  - matplotlib
+  - phantomjs
+  - plotly
+  - seaborn
+  - selenium
+
+  # Spatial packages
+  - cartopy
+  - contextily
+  - descartes
+  - earthpy
+  - folium
+  - geocoder
+  - geojson
+  - geopandas
+  - geopy
+  - h5py
+  - hydrofunctions
+  - laspy
+  - mapboxgl
+  - nc-time-axis
+  - netcdf4
+  - pyogrio
+  - pyproj>=3.0
+  - pysal
+  - rasterio
+  - rasterstats
+  - regionmask
+  - rioxarray
+  - rioxarray>=0.3.0
+  - scipy
+  - scipy.ndimage
+  - shapely
+  - shapely.geometry
+  - shapely.ops
+  - tweepy
+  - whitebox
+  - whitebox
+  - xarray
+  - xarray-spatial
+
+  # Natural language processing
+  - nltk
+  - textblob
+
+  # Jupyter Environment
+  - ipython
+  - jupyterlab
+  - nbclean
+  - nbresuse
+  - notebook
+  - papermill
+
+  # Textbook Format
+  - ghp-import
+  - jupyter-book
+  - sphinx-exercise
+  
+  # QA
+  - autopep8
+  - black
+  - flake8
+  - flake8-import-order
+  - nbqa
+  - pydocstyle
+  
+  # Autograding
+  - nbgrader
+
+  # leafmap segment anything
+  - flask<3.0.0
+  - leafmap
+  - localtileserver
+  - segment-geospatial
