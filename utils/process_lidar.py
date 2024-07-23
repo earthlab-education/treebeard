@@ -1,6 +1,8 @@
 # Utility methods used in processing LIDAR .las files into canopy gaps
 
 import numpy as np
+import tempfile
+
 import rioxarray
 import rasterio
 import geopandas as gpd
@@ -10,9 +12,10 @@ from shapely.ops import unary_union
 import whitebox
 
 # Process LAS files to canopy using Whitebox
-def convert_las_to_tif(input_las, output_tif, return_type):
+def convert_las_to_tif(input_las, output_tif, return_type, crs_code):
     """
-    Converts a LAS file to a GeoTIFF using WhiteboxTools, based on the specified return type.
+    Converts a LAS file to a GeoTIFF using WhiteboxTools, based on the specified return type,
+    processes it in a temporary file, sets the CRS to the specified EPSG code, and saves it to the output path.
 
     Parameters
     ----------
@@ -22,44 +25,47 @@ def convert_las_to_tif(input_las, output_tif, return_type):
         Path to save the output GeoTIFF file.
     return_type : str
         Type of returns to process. Must be either 'first' for first returns or 'ground' for ground returns.
-
-    Raises
-    ------
-    ValueError
-        If `return_type` is not 'first' or 'ground'.
-
-    Notes
-    -----
-    This function uses WhiteboxTools' `lidar_idw_interpolation` method to perform the conversion.
-    The interpolation method used is Inverse Distance Weighting (IDW) with a resolution of 1.
-
-    Examples
-    --------
-    >>> convert_las_to_tif_whitebox('input.las', 'output_first_returns.tif', 'first')
-    >>> convert_las_to_tif_whitebox('input.las', 'output_ground_returns.tif', 'ground')
+    crs_code : int
+        EPSG code for the CRS to set.
     """
     wbt = whitebox.WhiteboxTools()
-    
-    if return_type == "first":
-        wbt.lidar_idw_interpolation(
-            i=input_las,
-            output=output_tif,
-            parameter="elevation",
-            returns="first",
-            resolution=1.0,  # Define the resolution as needed
-            radius=3.0     # Define the search radius as needed
-        )
-    elif return_type == "ground":
-        wbt.lidar_idw_interpolation(
-            i=input_las,
-            output=output_tif,
-            parameter="elevation",
-            returns="ground",
-            resolution=1.0,  # Define the resolution as needed
-            radius=3.0     # Define the search radius as needed
-        )
-    else:
-        raise ValueError("Invalid return_type. Use 'first' or 'ground'.")
+    crs = CRS.from_epsg(crs_code)
+
+    # Create a temporary directory to store intermediate files
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        # Define temporary output file path
+        temp_output_tif = f"{tmpdirname}/temp_output.tif"
+
+        # Process LAS file to TIFF based on return type
+        if return_type == "first":
+            wbt.lidar_idw_interpolation(
+                i=input_las,
+                output=temp_output_tif,
+                parameter="elevation",
+                returns="first",
+                resolution=1.0,
+                radius=3.0
+            )
+        elif return_type == "ground":
+            wbt.lidar_idw_interpolation(
+                i=input_las,
+                output=temp_output_tif,
+                parameter="elevation",
+                returns="ground",
+                resolution=1.0,
+                radius=3.0
+            )
+        else:
+            raise ValueError("Invalid return_type. Use 'first' or 'ground'.")
+
+        # Load the temporary TIFF file with rioxarray
+        rioxarray_data = rioxarray.open_rasterio(temp_output_tif)
+
+        # Set the CRS
+        rioxarray_data.rio.write_crs(crs, inplace=True)
+
+        # Save to the final output path
+        rioxarray_data.rio.to_raster(output_tif)
     
 # Function to apply morphological operations on a rioxarray DataArray
 def clean_raster_rioxarray(raster_xarray, operation='opening', structure_size=3):
