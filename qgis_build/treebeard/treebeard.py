@@ -111,7 +111,7 @@ class TreebeardDialog(treebeardDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 
-'''
+
     def kmeans_clustering(self, raster_path, n_clusters=4):
         with rasterio.open(raster_path) as src:
             bands = [src.read(i) for i in range(1, src.count + 1)]
@@ -163,4 +163,3 @@ class TreebeardDialog(treebeardDialog):
         stats = gdf['geometry'].area.describe()
         print("Spatial Statistics:")
         print(stats)
-'''
