@@ -7,7 +7,7 @@ import rasterio
 from rasterio.features import shapes
 from shapely.geometry import shape, Polygon, MultiPolygon
 from shapely.ops import unary_union
-from skimage import io
+from skimage import io, color
 from skimage.segmentation import quickshift
 from sklearn.cluster import KMeans
 from tqdm import tqdm
@@ -202,7 +202,7 @@ def generate_binary_gdf(tilepath, n_clusters=2):
     return dissolved_gdf
 
 
-def generate_binary_gdf_ndvi(tilepath, n_clusters=2):
+def generate_binary_gdf_ndvi(tilepath, n_clusters=2, plot_segments=False, plot_path=None):
     # Load the image and bands
     tile = rasterio.open(tilepath)
     red = tile.read(1).astype(float)
@@ -222,8 +222,26 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2):
     # Segment the NDVI image using quickshift
     img = io.imread(tilepath)
     img_ndvi = np.expand_dims(ndvi, axis=2).astype(np.float32)
+    rgb_img = img[:, :, :3]
     segments = quickshift(img_ndvi, kernel_size=3, convert2lab=False, max_dist=6, ratio=0.5).astype('int32')
     print("Quickshift number of segments: %d" % len(np.unique(segments)))
+
+    # Plot Segments
+    if plot_segments:
+        plt.figure(figsize=(10, 10))
+        plt.imshow(color.label2rgb(segments, rgb_img, bg_label=0))
+        plt.title("Quickshift Segments")
+
+        # Remove axis labels, ticks, and tick labels
+        ax = plt.gca()
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.tick_params(axis='both', which='both', length=0)
+
+        if plot_path:
+            plt.savefig(plot_path)
 
     # Convert segments to vector features
     polys = []
@@ -268,7 +286,7 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2):
     return dissolved_gdf
 
 
-def plot_binary_gdf(dissolved_gdf):
+def plot_binary_gdf(dissolved_gdf, filepath=None, save_png_file=False):
     # Add a new column for categorical labels
     dissolved_gdf['category'] = dissolved_gdf['class'].map({1: 'Tree', 0: 'Not Tree'})
 
@@ -286,6 +304,9 @@ def plot_binary_gdf(dissolved_gdf):
                        legend_kwds={'title': "Class"})
     plt.title("Classified Segments (Tree and Not Tree)")
     plt.show()
+
+    if save_png_file:
+        plt.savefig(filepath)
 
 
 # Convert multipolygons to individual polygons
@@ -322,7 +343,7 @@ def calculate_area(gdf):
 
 
 # Function to bin and plot the areas
-def bin_plot(gdf, bins, labels, title):
+def bin_plot(gdf, bins, labels, title, filepath=None, save_png_file=False):
     gdf['bin'] = pd.cut(gdf['area_acres'], bins=bins, labels=labels, right=False)
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
@@ -340,8 +361,11 @@ def bin_plot(gdf, bins, labels, title):
     plt.savefig(f'{filename}.png')
     plt.show()
 
+    if save_png_file:
+        plt.savefig(filepath)
 
-def plot_gdf(gdf, title):
+
+def plot_gdf(gdf, title, filepath=None, save_png_file=False):
     fig, ax = plt.subplots(figsize=(10, 10))
     # Remove axis labels, ticks, and tick labels
     ax.set_xticks([])
@@ -352,6 +376,9 @@ def plot_gdf(gdf, title):
     gdf.plot(ax=ax, color='lightblue', edgecolor='black')
     plt.title(title)
     plt.show()
+
+    if save_png_file:
+        plt.savefig(filepath)
 
 
 def get_bounds_gdf(geotiff_path):
