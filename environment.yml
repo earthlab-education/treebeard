@@ -8,53 +8,65 @@ dependencies:
   - pip
   
   # Core scientific python
+  - kiwisolver
   - numpy
   - pyqt
   - tqdm
-  - kiwisolver
+
+  # Data Handling
+  - json  # Standard library, included here for completeness
+  - pandas
+  - requests
   
   # ML
-  - scikit-learn
   - scikit-fuzzy
+  - scikit-learn
   
   # Plotting
+  - cartopy
+  - firefox
+  - geoviews>=1.10
+  - hvplot
+  - jupyter_bokeh
   - matplotlib
+  - phantomjs
   - plotly
   - seaborn
-  - hvplot
-  - geoviews>=1.10
   - selenium
-  - phantomjs
-  - jupyter_bokeh
-  - firefox
-  - cartopy
-  - geckodriver
 
   # Spatial packages
-  - earthpy
-  - laspy
-  - pdal
-  - pysal
-  - pyproj>=3.0
-  - rasterstats
-  - geopy
   - cartopy
-  - descartes
   - contextily
+  - descartes
+  - earthpy
   - folium
-  - geojson
-  - mapboxgl
-  - hydrofunctions
   - geocoder
-  - tweepy
-  - xarray
-  - rioxarray>=0.3.0
+  - geojson
+  - geopandas
+  - geopy
   - h5py
-  - scipy
-  - netcdf4
+  - hydrofunctions
+  - laspy
+  - mapboxgl
   - nc-time-axis
-  - regionmask
+  - netcdf4
   - pyogrio
+  - pyproj>=3.0
+  - pysal
+  - rasterio
+  - rasterstats
+  - regionmask
+  - rioxarray
+  - rioxarray>=0.3.0
+  - scipy
+  - scipy.ndimage
+  - shapely
+  - shapely.geometry
+  - shapely.ops
+  - tweepy
+  - whitebox
+  - whitebox
+  - xarray
   - xarray-spatial
 
   # Natural language processing
@@ -62,31 +74,31 @@ dependencies:
   - textblob
 
   # Jupyter Environment
-  - papermill
-  - jupyterlab
-  - notebook
   - ipython
+  - jupyterlab
   - nbclean
   - nbresuse
+  - notebook
+  - papermill
 
   # Textbook Format
+  - ghp-import
   - jupyter-book
   - sphinx-exercise
-  - ghp-import
   
   # QA
+  - autopep8
+  - black
   - flake8
   - flake8-import-order
-  - black
-  - autopep8
-  - pydocstyle
   - nbqa
+  - pydocstyle
   
   # Autograding
   - nbgrader
 
   # leafmap segment anything
-  - leafmap
-  - segment-geospatial
-  - localtileserver
   - flask<3.0.0
+  - leafmap
+  - localtileserver
+  - segment-geospatial
