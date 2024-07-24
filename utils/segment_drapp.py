@@ -228,20 +228,29 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2, plot_segments=False, plot_p
 
     # Plot Segments
     if plot_segments:
-        plt.figure(figsize=(10, 10))
-        plt.imshow(color.label2rgb(segments, rgb_img, bg_label=0))
-        plt.title("Quickshift Segments")
+        fig, ax = plt.subplots(1, 2, figsize=(5, 10))
 
-        # Remove axis labels, ticks, and tick labels
-        ax = plt.gca()
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
-        ax.tick_params(axis='both', which='both', length=0)
+        # Original Pixels
+        ax[0].imshow(rgb_img)
+        ax[0].set_title("Original Pixels")
+        ax[0].set_xticks([])
+        ax[0].set_yticks([])
+        ax[0].set_xticklabels([])
+        ax[0].set_yticklabels([])
+        ax[0].tick_params(axis='both', which='both', length=0)
+
+        # Quickshift Segments
+        ax[1].imshow(color.label2rgb(segments, rgb_img, bg_label=0))
+        ax[1].set_title("Quickshift Segments")
+        ax[1].set_xticks([])
+        ax[1].set_yticks([])
+        ax[1].set_xticklabels([])
+        ax[1].set_yticklabels([])
+        ax[1].tick_params(axis='both', which='both', length=0)
 
         if plot_path:
             plt.savefig(plot_path)
+        plt.show()
 
     # Convert segments to vector features
     polys = []
@@ -266,11 +275,14 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2, plot_segments=False, plot_p
 
     # Determine which cluster corresponds to 'tree' based on NDVI values
     cluster_mean_ndvi = [mean_ndvi_vals[labels == i].mean() for i in range(n_clusters)]
-    tree_cluster = np.argmax(cluster_mean_ndvi)
-    not_tree_cluster = 1 - tree_cluster
+    tree_cluster_idx = np.argmax(cluster_mean_ndvi)
+
+    # Test
+    print("Cluster mean NDVI values:", cluster_mean_ndvi)
+    print("Index of tree cluster:", tree_cluster_idx)
 
     # Assign class labels based on the cluster with higher NDVI being 'tree'
-    gdf['class'] = gdf['cluster'].apply(lambda x: 1 if x == tree_cluster else 0)
+    gdf['class'] = gdf['cluster'].apply(lambda x: 1 if x == tree_cluster_idx else 0)
 
     # Dissolve polygons by 'class' to merge connected polygons
     dissolved_gdfs = []
@@ -303,10 +315,11 @@ def plot_binary_gdf(dissolved_gdf, filepath=None, save_png_file=False):
                        ax=ax, legend=True, cmap='viridis',
                        legend_kwds={'title': "Class"})
     plt.title("Classified Segments (Tree and Not Tree)")
-    plt.show()
 
     if save_png_file:
         plt.savefig(filepath)
+
+    plt.show()
 
 
 # Convert multipolygons to individual polygons
@@ -355,14 +368,17 @@ def bin_plot(gdf, bins, labels, title, filepath=None, save_png_file=False):
     ax.tick_params(axis='both', which='both', length=0)
 
     plot = gdf.plot(column='bin', ax=ax, legend=True, categorical=True, legend_kwds={'title': 'Size Category'})
+    # plot = gdf.plot(column='bin', ax=ax, legend=True, categorical=True, 
+    #                 legend_kwds={'title': 'Size Category'}, edgecolor='black')
     ax.set_title(title)
     plt.tight_layout()
     filename = title.split('.')[0]
     plt.savefig(f'{filename}.png')
-    plt.show()
 
     if save_png_file:
         plt.savefig(filepath)
+    
+    plt.show()
 
 
 def plot_gdf(gdf, title, filepath=None, save_png_file=False):
@@ -375,10 +391,11 @@ def plot_gdf(gdf, title, filepath=None, save_png_file=False):
     ax.tick_params(axis='both', which='both', length=0)
     gdf.plot(ax=ax, color='lightblue', edgecolor='black')
     plt.title(title)
-    plt.show()
 
     if save_png_file:
         plt.savefig(filepath)
+
+    plt.show()
 
 
 def get_bounds_gdf(geotiff_path):
