@@ -220,7 +220,8 @@ def merge_tiles(drapp_tilepaths: list,
 
 def plot_rgb_image(tile_path: str,
                    drapp_aoi_gdf: gpd.GeoDataFrame,
-                   title_prefix: str = "RGB Image:"):
+                   title_prefix: str = "RGB Image:",
+                   save_png_file=False):
     # Open the merged GeoTIFF file
     with rasterio.open(tile_path) as src:
         mosaic = src.read()
@@ -258,3 +259,8 @@ def plot_rgb_image(tile_path: str,
         title = f'{title_prefix} DRAPP Tile {tile_name} ({photo_date})'
 
     ax.set_title(title)
+
+    # Save PNG File
+    if save_png_file:
+        output_path = tile_path.replace('.tif', '.png')
+        plt.savefig(output_path)

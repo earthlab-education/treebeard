@@ -7,7 +7,7 @@ import rasterio
 from rasterio.features import shapes
 from shapely.geometry import shape, Polygon, MultiPolygon
 from shapely.ops import unary_union
-from skimage import io
+from skimage import io, color
 from skimage.segmentation import quickshift
 from sklearn.cluster import KMeans
 from tqdm import tqdm
@@ -202,7 +202,7 @@ def generate_binary_gdf(tilepath, n_clusters=2):
     return dissolved_gdf
 
 
-def generate_binary_gdf_ndvi(tilepath, n_clusters=2):
+def generate_binary_gdf_ndvi(tilepath, n_clusters=2, plot_segments=False, plot_path=None):
     # Load the image and bands
     tile = rasterio.open(tilepath)
     red = tile.read(1).astype(float)
@@ -222,8 +222,35 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2):
     # Segment the NDVI image using quickshift
     img = io.imread(tilepath)
     img_ndvi = np.expand_dims(ndvi, axis=2).astype(np.float32)
+    rgb_img = img[:, :, :3]
     segments = quickshift(img_ndvi, kernel_size=3, convert2lab=False, max_dist=6, ratio=0.5).astype('int32')
     print("Quickshift number of segments: %d" % len(np.unique(segments)))
+
+    # Plot Segments
+    if plot_segments:
+        fig, ax = plt.subplots(1, 2, figsize=(5, 10))
+
+        # Original Pixels
+        ax[0].imshow(rgb_img)
+        ax[0].set_title("Original Pixels")
+        ax[0].set_xticks([])
+        ax[0].set_yticks([])
+        ax[0].set_xticklabels([])
+        ax[0].set_yticklabels([])
+        ax[0].tick_params(axis='both', which='both', length=0)
+
+        # Quickshift Segments
+        ax[1].imshow(color.label2rgb(segments, rgb_img, bg_label=0))
+        ax[1].set_title("Quickshift Segments")
+        ax[1].set_xticks([])
+        ax[1].set_yticks([])
+        ax[1].set_xticklabels([])
+        ax[1].set_yticklabels([])
+        ax[1].tick_params(axis='both', which='both', length=0)
+
+        if plot_path:
+            plt.savefig(plot_path)
+        plt.show()
 
     # Convert segments to vector features
     polys = []
@@ -248,11 +275,14 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2):
 
     # Determine which cluster corresponds to 'tree' based on NDVI values
     cluster_mean_ndvi = [mean_ndvi_vals[labels == i].mean() for i in range(n_clusters)]
-    tree_cluster = np.argmax(cluster_mean_ndvi)
-    not_tree_cluster = 1 - tree_cluster
+    tree_cluster_idx = np.argmax(cluster_mean_ndvi)
+
+    # Test
+    print("Cluster mean NDVI values:", cluster_mean_ndvi)
+    print("Index of tree cluster:", tree_cluster_idx)
 
     # Assign class labels based on the cluster with higher NDVI being 'tree'
-    gdf['class'] = gdf['cluster'].apply(lambda x: 1 if x == tree_cluster else 0)
+    gdf['class'] = gdf['cluster'].apply(lambda x: 1 if x == tree_cluster_idx else 0)
 
     # Dissolve polygons by 'class' to merge connected polygons
     dissolved_gdfs = []
@@ -268,7 +298,7 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2):
     return dissolved_gdf
 
 
-def plot_binary_gdf(dissolved_gdf):
+def plot_binary_gdf(dissolved_gdf, filepath=None, save_png_file=False):
     # Add a new column for categorical labels
     dissolved_gdf['category'] = dissolved_gdf['class'].map({1: 'Tree', 0: 'Not Tree'})
 
@@ -285,6 +315,10 @@ def plot_binary_gdf(dissolved_gdf):
                        ax=ax, legend=True, cmap='viridis',
                        legend_kwds={'title': "Class"})
     plt.title("Classified Segments (Tree and Not Tree)")
+
+    if save_png_file:
+        plt.savefig(filepath)
+
     plt.show()
 
 
@@ -322,7 +356,7 @@ def calculate_area(gdf):
 
 
 # Function to bin and plot the areas
-def bin_plot(gdf, bins, labels, title):
+def bin_plot(gdf, bins, labels, title, filepath=None, save_png_file=False):
     gdf['bin'] = pd.cut(gdf['area_acres'], bins=bins, labels=labels, right=False)
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
@@ -334,14 +368,20 @@ def bin_plot(gdf, bins, labels, title):
     ax.tick_params(axis='both', which='both', length=0)
 
     plot = gdf.plot(column='bin', ax=ax, legend=True, categorical=True, legend_kwds={'title': 'Size Category'})
+    # plot = gdf.plot(column='bin', ax=ax, legend=True, categorical=True, 
+    #                 legend_kwds={'title': 'Size Category'}, edgecolor='black')
     ax.set_title(title)
     plt.tight_layout()
     filename = title.split('.')[0]
     plt.savefig(f'{filename}.png')
+
+    if save_png_file:
+        plt.savefig(filepath)
+    
     plt.show()
 
 
-def plot_gdf(gdf, title):
+def plot_gdf(gdf, title, filepath=None, save_png_file=False):
     fig, ax = plt.subplots(figsize=(10, 10))
     # Remove axis labels, ticks, and tick labels
     ax.set_xticks([])
@@ -351,6 +391,10 @@ def plot_gdf(gdf, title):
     ax.tick_params(axis='both', which='both', length=0)
     gdf.plot(ax=ax, color='lightblue', edgecolor='black')
     plt.title(title)
+
+    if save_png_file:
+        plt.savefig(filepath)
+
     plt.show()
 
 
