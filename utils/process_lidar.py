@@ -166,6 +166,8 @@ def process_canopy_areas(canopy_gdf, study_area, buffer_distance=5):
 
     Returns
     -------
+    clipped_buffer : gpd.GeoDataFrame
+        GeoDataFrame with the buffered and clipped canopy areas.
     exploded_gap_gdf : gpd.GeoDataFrame
         GeoDataFrame with exploded geometries representing non-tree canopy areas, including acreage and size category.
     """
@@ -217,4 +219,4 @@ def process_canopy_areas(canopy_gdf, study_area, buffer_distance=5):
     # Apply the categorization function to the Acreage column
     exploded_gap_gdf['Gap_Size_Category'] = exploded_gap_gdf['Acreage'].apply(categorize_gap_size)
 
-    return exploded_gap_gdf
+    return clipped_buffer, exploded_gap_gdf
