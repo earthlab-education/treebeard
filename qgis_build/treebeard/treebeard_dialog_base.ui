@@ -147,6 +147,19 @@
     <string>Process Canopy Cover (Lidar)</string>
    </property>
   </widget>
+  <widget class="QPushButton" name="reportSpataialButton">
+   <property name="geometry">
+    <rect>
+     <x>102</x>
+     <y>170</y>
+     <width>261</width>
+     <height>31</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Report Spatial Heterogeneity Sats</string>
+   </property>
+  </widget>
  </widget>
  <resources/>
  <connections/>

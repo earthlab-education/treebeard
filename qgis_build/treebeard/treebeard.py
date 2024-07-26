@@ -13,38 +13,67 @@ import rioxarray
 import rasterio
 import whitebox
 
-# Ensure extlibs are in sys.path
-plugin_dir = os.path.dirname(__file__)
-extlibs_path = os.path.join(plugin_dir, 'extlibs')
-if extlibs_path not in sys.path:
-    sys.path.append(extlibs_path)
+import sys
+import os
+
 
 from .treebeard_dialog import treebeardDialog
+from .import_lidar_dialog import Ui_import_lidar_dialog as ImportLidarDialog
+from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
 
-class TreebeardDialog(QDialog, treebeardDialog):
+class TreebeardDialog(treebeardDialog):
     def __init__(self, parent=None):
+        """Constructor for the dialog class."""
         super(TreebeardDialog, self).__init__(parent)
-        self.setupUi(self)
-        self.browseLidarButton.clicked.connect(self.open_import_dialog)
-        self.processLidarButton.clicked.connect(self.process_lidar_data)
-        self.importMethodComboBox.currentIndexChanged.connect(self.import_method_changed)
+        self.browseRasterButton.clicked.connect(self.show_import_raster_dialog)
+        self.browsePolygonButton.clicked.connect(self.browse_polygon_file)
+        self.processButton.clicked.connect(self.process_files)
+        self.browseLidarButton.clicked.connect(self.show_import_lidar_dialog)
+        self.processCanopyButton.clicked.connect(self.process_lidar_data)
         self.raster_path = ""
         self.polygon_path = ""
+        self.lidar_path = ""
 
-    def import_method_changed(self):
-        import_method = self.importMethodComboBox.currentText()
-        if import_method == "Import from QGIS Layer":
-            self.load_from_qgis_layer()
-        elif import_method == "Download from Dataset":
-            self.download_from_dataset()
-        elif import_method == "Load from PC":
-            self.load_from_pc()
+    def show_import_raster_dialog(self):
+        dialog = QDialog()
+        ui = ImportRasterDialog()
+        ui.setupUi(dialog)
+        if dialog.exec_() == QDialog.Accepted:
+            selection = ui.comboBox.currentText()
+            if selection == "Import from QGIS Layer":
+                self.raster_path = self.import_from_qgis_layer()
+            elif selection == "Import from Dataset":
+                self.raster_path = self.download_from_dataset()
+            elif selection == "Import from Desktop":
+                self.raster_path, _ = QFileDialog.getOpenFileName(self, "Select Raster File", "", "Raster files (*.tif)")
+            self.rasterLineEdit.setText(self.raster_path)
 
-    def open_import_dialog(self):
-        self.import_dialog = QDialog(self)
-        self.import_dialog.setWindowTitle("Import LiDAR Data")
-        self.import_dialog.setGeometry(100, 100, 400, 200)
-        self.import_dialog.exec_()
+    def show_import_lidar_dialog(self):
+        dialog = QDialog()
+        ui = ImportLidarDialog()
+        ui.setupUi(dialog)
+        if dialog.exec_() == QDialog.Accepted:
+            selection = ui.comboBox.currentText()
+            if selection == "Import from QGIS Layer":
+                self.lidar_path = self.import_from_qgis_layer()
+            elif selection == "Import from Dataset":
+                self.lidar_path = self.download_from_dataset()
+            elif selection == "Import from Desktop":
+                self.lidar_path, _ = QFileDialog.getOpenFileName(self, "Select LiDAR File", "", "LiDAR files (*.las)")
+            self.lidarLineEdit.setText(self.lidar_path)
+
+    def browse_polygon_file(self):
+        """Browse and select a boundary polygon file."""
+        self.polygon_path, _ = QFileDialog.getOpenFileName(self, "Select Boundary Polygon File", "", "Vector files (*.shp *.geojson)")
+        if self.polygon_path:
+            self.polygonLineEdit.setText(self.polygon_path)
+
+    def process_files(self):
+        """Process the selected files."""
+        if not self.raster_path or not self.polygon_path:
+            QMessageBox.critical(self, "Error", "Please select both raster and polygon files.")
+            return
+        # Add processing logic here
 
     def load_from_qgis_layer(self):
         pass
