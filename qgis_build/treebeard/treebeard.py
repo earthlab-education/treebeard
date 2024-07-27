@@ -4,11 +4,12 @@ import numpy as np
 from qgis.PyQt.QtWidgets import QFileDialog, QDialog, QAction, QMessageBox
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import QgsProject, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry
-from PyQt5.QtCore import QVariant
+from PyQt5.QtCore import QVariant, QCoreApplication
 import geopandas as gpd
 from shapely.geometry import shape
 from scipy.ndimage import binary_opening, binary_closing
 from shapely.ops import unary_union
+import requests
 import rioxarray
 import rasterio
 import whitebox
@@ -34,33 +35,78 @@ class TreebeardDialog(treebeardDialog):
         self.polygon_path = ""
         self.lidar_path = ""
 
+
     def show_import_raster_dialog(self):
         dialog = QDialog()
-        ui = ImportRasterDialog()
+        ui =  ImportLidarDialog()
         ui.setupUi(dialog)
+        
+        ui.confirmOK.clicked.connect(lambda: self.handle_raster_selection(ui, dialog))
+        ui.confirmCancel.clicked.connect(dialog.reject)
+
         if dialog.exec_() == QDialog.Accepted:
-            selection = ui.comboBox.currentText()
-            if selection == "Import from QGIS Layer":
-                self.raster_path = self.import_from_qgis_layer()
-            elif selection == "Import from Dataset":
-                self.raster_path = self.download_from_dataset()
-            elif selection == "Import from Desktop":
-                self.raster_path, _ = QFileDialog.getOpenFileName(self, "Select Raster File", "", "Raster files (*.tif)")
             self.rasterLineEdit.setText(self.raster_path)
 
     def show_import_lidar_dialog(self):
         dialog = QDialog()
         ui = ImportLidarDialog()
         ui.setupUi(dialog)
+        
+        ui.confirmOK.clicked.connect(lambda: self.handle_lidar_selection(ui, dialog))
+        ui.confirmCancel.clicked.connect(dialog.reject)
+
         if dialog.exec_() == QDialog.Accepted:
-            selection = ui.comboBox.currentText()
-            if selection == "Import from QGIS Layer":
-                self.lidar_path = self.import_from_qgis_layer()
-            elif selection == "Import from Dataset":
-                self.lidar_path = self.download_from_dataset()
-            elif selection == "Import from Desktop":
-                self.lidar_path, _ = QFileDialog.getOpenFileName(self, "Select LiDAR File", "", "LiDAR files (*.las)")
             self.lidarLineEdit.setText(self.lidar_path)
+
+    def handle_raster_selection(self, ui, dialog):
+        selection = ui.importRasterComboBox.currentText()
+        if selection == "Import from QGIS Layer":
+            self.raster_path = self.import_from_qgis_layer()
+        elif selection == "Import from Dataset":
+            self.raster_path = self.download_from_dataset()
+        elif selection == "Import from Desktop":
+            self.raster_path, _ = QFileDialog.getOpenFileName(dialog, "Select Raster File", "", "Raster files (*.tif)")
+        dialog.accept()
+
+    def handle_lidar_selection(self, ui, dialog):
+        selection = ui.importLidarComboBox.currentText()
+        if selection == "Import from QGIS Layer":
+            self.lidar_path = self.import_from_qgis_layer()
+        elif selection == "Import from Dataset":
+            self.lidar_path = self.download_from_dataset()
+        elif selection == "Import from Desktop":
+            self.lidar_path, _ = QFileDialog.getOpenFileName(dialog, "Select LiDAR File", "", "LiDAR files (*.las)")
+        dialog.accept()
+    
+    def download_lidar_files(self, tiles_by_area, lidar_las_dir):
+        las_root_url = 'https://lidararchive.s3.amazonaws.com/2020_CSPN_Q2/'
+        canopy_dict = {}
+        
+        if not self.boundary_polygon_path:
+            QMessageBox.critical(None, "Error", "Please import a boundary polygon first.")
+            return
+
+        proj_area_gdf = gpd.read_file(self.boundary_polygon_path)
+        site_to_process = tiles_by_area[tiles_by_area['Proj_ID'] == 'Zumwinkel'].copy()
+        for index, row in site_to_process.iterrows():
+            tiles = row['tile']
+            proj_area_name = row['Proj_ID']
+            sel_proj_area_gdf = proj_area_gdf[proj_area_gdf['Proj_ID'] == proj_area_name]
+            tile_agg = []
+            print("Processing LIDAR for " + proj_area_name)
+            for tile in tiles:
+                file_name = tile + ".las"
+                print("Processing LIDAR tile " + tile)
+                tile_path = os.path.join(lidar_las_dir, file_name)
+                download_url = las_root_url + tile + ".las"
+                if not os.path.exists(tile_path):
+                    response = requests.get(download_url)
+                    if response.status_code == 200:
+                        with open(tile_path, 'wb') as file:
+                            file.write(response.content)
+                        print(f"File downloaded successfully and saved to {tile_path}")
+                    else:
+                        print(f"Failed to download file. Status code: {response.status_code}")
 
     def browse_polygon_file(self):
         """Browse and select a boundary polygon file."""
