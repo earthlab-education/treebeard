@@ -5,3 +5,5 @@ profile_default/
 ipython_config.py
 */__pycache__/*
 treebeard_v2_aoi4.ipynb
+notebooks/
+scratch/
