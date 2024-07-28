@@ -2,27 +2,16 @@ import os
 import requests
 import urllib.parse
 import zipfile
+
 import plotly.express as px
 import plotly.graph_objects as go
 import geopandas as gpd
-from shapely.geometry import MultiPolygon
-
-
-def check_contiguity(gdf: gpd.GeoDataFrame) -> bool:
-    """
-    Check if geometries in a GeoDataFrame are contiguous.
-    
-    Parameters:
-    gdf (GeoDataFrame): GeoDataFrame to check for contiguity.
-
-    Returns:
-    bool: True if all geometries are contiguous, False otherwise.
-    """
-    gdf = gdf.dissolve()
-    is_multipolygon = gdf.geometry.apply(
-        lambda geom: isinstance(geom, MultiPolygon)).all()
-    is_contiguous = not is_multipolygon
-    return is_contiguous
+import rasterio
+from rasterio.merge import merge
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from rasterio.mask import mask
 
 
 def get_filename_from_url(url):
@@ -54,12 +43,9 @@ def download_files(localpath, urls):
         path = os.path.join(localpath, filename)
         paths.append(path)
         if not os.path.exists(path):
-            print(f"Downloading {url}...")
             resp = requests.get(url)
             with open(path, 'wb') as f:
                 f.write(resp.content)
-        else:
-            print(f"File {filename} already downloaded.")
     return paths
 
 
@@ -98,17 +84,6 @@ def save_drapp_tiles(localpath, tilenames: list, tile_base_url=None):
 
 
 def plot_aoi_bbox_drapp(aoi_gdf, bbox_aoi_gdf, drapp_aoi_gdf):
-    """
-    Generate a Plotly mapbox plot with AOI, BBOX, and DRAPP tiles.
-
-    Parameters:
-    aoi_gdf (GeoDataFrame): GeoDataFrame containing the AOI geometry.
-    bbox_aoi_gdf (GeoDataFrame): GeoDataFrame containing the bounding box geometry.
-    drapp_aoi_gdf (GeoDataFrame): GeoDataFrame containing the DRAPP tile geometries along with photo_date and tile information.
-
-    Returns:
-    fig (Figure): Plotly figure with the map and overlays.
-    """
     # Add label to AOI GeoDataFrame
     aoi_gdf['label'] = 'Area of Interest'
 
@@ -146,3 +121,96 @@ def plot_aoi_bbox_drapp(aoi_gdf, bbox_aoi_gdf, drapp_aoi_gdf):
         ))
 
     return fig
+
+
+def crop_geotiff(merged_tile_path: str, bbox_aoi_gdf: gpd.GeoDataFrame, crop_output_path: str):
+    # Open the merged GeoTIFF file
+    with rasterio.open(merged_tile_path) as src:
+        # Ensure the CRS of the GeoDataFrame matches the raster's CRS
+        if bbox_aoi_gdf.crs != src.crs:
+            bbox_aoi_gdf = bbox_aoi_gdf.to_crs(src.crs)
+
+        # Create a mask for cropping
+        geom = [bbox_aoi_gdf.geometry.unary_union]  # Combine all geometries in the GeoDataFrame
+        out_image, out_transform = mask(src, geom, crop=True)
+
+        # Update the metadata for the cropped raster
+        out_meta = src.meta.copy()
+        out_meta.update({
+            "driver": "GTiff",
+            "height": out_image.shape[1],
+            "width": out_image.shape[2],
+            "transform": out_transform
+        })
+
+    # Save the cropped GeoTIFF file
+    with rasterio.open(crop_output_path, "w", **out_meta) as dest:
+        dest.write(out_image)
+
+    return crop_output_path
+
+
+def merge_drapp_tiles(drapp_tilepaths: list,
+                      output_dir: str,
+                      output_filename='drapp_merged.tif'):
+    # Open all the files
+    src_files_to_mosaic = [rasterio.open(path) for path in drapp_tilepaths]
+    mosaic, out_trans = merge(src_files_to_mosaic)
+
+    # Save the merged tile as a GeoTIFF
+    out_meta = src_files_to_mosaic[0].meta.copy()
+    out_meta.update({
+        "driver": "GTiff",
+        "height": mosaic.shape[1],
+        "width": mosaic.shape[2],
+        "transform": out_trans,
+        "count": mosaic.shape[0]
+    })
+
+    output_path = f"{output_dir}/{output_filename}"
+
+    with rasterio.open(output_path, "w", **out_meta) as dest:
+        dest.write(mosaic)
+
+    # Close all opened files
+    for src in src_files_to_mosaic:
+        src.close()
+
+    return output_path
+
+
+def plot_rgb_image(tile_path: str,
+                   drapp_aoi_gdf: gpd.GeoDataFrame,
+                   title_prefix: str = "RGB Image:"):
+    # Open the merged GeoTIFF file
+    with rasterio.open(tile_path) as src:
+        mosaic = src.read()
+        red = mosaic[0]
+        green = mosaic[1]
+        blue = mosaic[2]
+        rgb = np.dstack((red, green, blue))
+
+    # Create the plot
+    fig, ax = plt.subplots()
+    ax.imshow(rgb)
+
+    # Get counts and unique values
+    tiles_count = len(drapp_aoi_gdf['tile'].unique())
+    photo_dates_count = len(drapp_aoi_gdf['photo_date'].unique())
+    photo_date = (pd.to_datetime(drapp_aoi_gdf['photo_date'])
+                    .dt.date.unique()[0]
+                    .strftime('%Y-%m-%d'))
+
+    # Determine the title
+    if tiles_count > 1:
+        if photo_dates_count > 1:
+            title = f'{title_prefix} DRAPP Tiles (Multiple)'
+        elif photo_dates_count == 1:
+            title = f'{title_prefix} DRAPP Tiles (Multiple) ({photo_date})'
+    elif tiles_count == 1:
+        tile_name = drapp_aoi_gdf['tile'].unique()[0]
+        title = f'{title_prefix} DRAPP Tile {tile_name} ({photo_date})'
+
+    ax.set_title(title)
+
+    return fig, ax

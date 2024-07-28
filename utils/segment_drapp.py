@@ -261,6 +261,10 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2, plot_segments=False, plot_p
     mean_ndvi_vals = []
     for shp in tqdm(polys, desc="Computing mean NDVI values"):
         mask = rasterio.features.geometry_mask([shp], transform=affine, invert=True, out_shape=ndvi.shape)
+        # by indexes instead of co-ordinates
+        # by segments instead of polys 
+        # zip them later
+        ## have both steps dependent to segments
         mean_ndvi_vals.append(ndvi[mask].mean())
 
     mean_ndvi_vals = np.array(mean_ndvi_vals).reshape(-1, 1)
@@ -298,6 +302,126 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2, plot_segments=False, plot_p
     return dissolved_gdf
 
 
+def generate_binary_gdf_ndvi_v2(tilepath, n_clusters=2, plot_segments=False, plot_path=None):
+    # Load the image and bands
+    tile = rasterio.open(tilepath)
+    red = tile.read(1).astype(float)
+    nir = tile.read(4).astype(float)
+
+    # Get image bounding box info
+    sr = tile.crs
+    bounds = tile.bounds
+    affine = tile.transform
+
+    # Compute NDVI using earthpy.spatial.normalized_diff
+    ndvi = es.normalized_diff(nir, red)
+
+    # Calculate the total number of pixels in the NDVI array
+    total_pixels = ndvi.size
+    print(f"Total number of pixels in the NDVI array: {total_pixels}")
+
+    # Handle NaN values
+    ndvi = np.where(np.isnan(ndvi), 0, ndvi)
+
+    # Segment the NDVI image using quickshift
+    img = io.imread(tilepath)
+    img_ndvi = np.expand_dims(ndvi, axis=2).astype(np.float32)
+    rgb_img = img[:, :, :3]
+    segments = quickshift(img_ndvi, kernel_size=3, convert2lab=False, max_dist=6, ratio=0.5).astype('int32')
+    print("Quickshift number of segments: %d" % len(np.unique(segments)))
+
+    if plot_segments and plot_path:
+        # Plot Original Pixels
+        plt.imshow(rgb_img)
+        plt.title("Original Pixels")
+        plt.axis('off')
+        plt.savefig(f"{plot_path}_original_pixels.png")
+        plt.close()
+
+        # Plot NDVI
+        plt.imshow(ndvi, cmap='RdYlGn')
+        plt.title("NDVI")
+        plt.axis('off')
+        plt.savefig(f"{plot_path}_ndvi.png")
+        plt.close()
+
+        # Plot Quickshift Segments
+        plt.imshow(color.label2rgb(segments, rgb_img, bg_label=0))
+        plt.title("Quickshift Segments")
+        plt.axis('off')
+        plt.savefig(f"{plot_path}_quickshift_segments.png")
+        plt.close()
+
+        # Plot NDVI Mean by Segments
+        segment_means = np.zeros_like(ndvi)
+        for seg_val in np.unique(segments):
+            segment_means[segments == seg_val] = ndvi[segments == seg_val].mean()
+        plt.imshow(segment_means, cmap='RdYlGn')
+        plt.title("NDVI Mean by Segments")
+        plt.axis('off')
+        plt.savefig(f"{plot_path}_ndvi_mean_by_segments.png")
+        plt.close()
+
+        # Convert segments to vector features
+        polys = []
+        for shp, value in tqdm(shapes(segments, transform=affine), desc="Converting segments to vector features"):
+            polys.append(shp)
+
+        # Compute mean NDVI for each segment
+        mean_ndvi_vals = []
+        for shp in tqdm(polys, desc="Computing mean NDVI values"):
+            mask = rasterio.features.geometry_mask([shp], transform=affine, invert=True, out_shape=ndvi.shape)
+            mean_ndvi = ndvi[mask].mean()
+            mean_ndvi_vals.append(mean_ndvi)
+            if len(mean_ndvi_vals) < 10:
+                print(f"Segment: {len(mean_ndvi_vals)} | NDVI Mean: {mean_ndvi}")
+
+        mean_ndvi_vals = np.array(mean_ndvi_vals).reshape(-1, 1)
+
+        # Apply k-means clustering
+        kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(mean_ndvi_vals)
+        labels = kmeans.labels_
+
+        # Create GeoDataFrame with segments and their cluster labels
+        geom = [shape(i) for i in polys]
+        gdf = gpd.GeoDataFrame({'geometry': geom, 'cluster': labels}, crs=sr)
+
+        # Determine which cluster corresponds to 'tree' based on NDVI values
+        cluster_mean_ndvi = [mean_ndvi_vals[labels == i].mean() for i in range(n_clusters)]
+        tree_cluster_idx = np.argmax(cluster_mean_ndvi)
+
+        # Test
+        print("Cluster mean NDVI values:", cluster_mean_ndvi)
+        print("Index of tree cluster:", tree_cluster_idx)
+
+        # Assign class labels based on the cluster with higher NDVI being 'tree'
+        gdf['class'] = gdf['cluster'].apply(lambda x: 1 if x == tree_cluster_idx else 0)
+
+        # Dissolve polygons by 'class' to merge connected polygons
+        dissolved_gdfs = []
+        for cls in tqdm(gdf['class'].unique(), desc="Dissolving polygons by class"):
+            class_gdf = gdf[gdf['class'] == cls]
+            dissolved_gdf = class_gdf.dissolve()
+            dissolved_gdf['class'] = cls
+            dissolved_gdfs.append(dissolved_gdf)
+
+        # Combine the dissolved GeoDataFrames
+        dissolved_gdf = gpd.GeoDataFrame(pd.concat(dissolved_gdfs, ignore_index=True), crs=sr)
+
+        # Plot Classified Clusters (Tree vs Not Tree)
+        classified_img = np.zeros_like(ndvi)
+        for shp, cls in zip(polys, labels):
+            mask = rasterio.features.geometry_mask([shp], transform=affine, invert=True, out_shape=classified_img.shape)
+            classified_img[mask] = cls
+        plt.imshow(classified_img, cmap='gray')
+        plt.title("Classified Clusters (Tree vs Not Tree)")
+        plt.axis('off')
+        plt.savefig(f"{plot_path}_classified_clusters.png")
+        plt.close()
+
+    return dissolved_gdf
+
+
 def plot_binary_gdf(dissolved_gdf, filepath=None, save_png_file=False):
     # Add a new column for categorical labels
     dissolved_gdf['category'] = dissolved_gdf['class'].map({1: 'Tree', 0: 'Not Tree'})
@@ -314,7 +438,7 @@ def plot_binary_gdf(dissolved_gdf, filepath=None, save_png_file=False):
     dissolved_gdf.plot(column='category',
                        ax=ax, legend=True, cmap='viridis',
                        legend_kwds={'title': "Class"})
-    plt.title("Classified Segments (Tree and Not Tree)")
+    plt.title("Classified Clusters (Tree and Not Tree)")
 
     if save_png_file:
         plt.savefig(filepath)
