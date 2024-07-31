@@ -147,11 +147,28 @@ class TreebeardDialog(treebeardDialog):
             # Add the processed LiDAR data to QGIS as a raster layer
             self.load_raster_to_qgis(output_tif, 'Processed LiDAR Canopy')
 
+            # Load Boundary
+            boundary_polygon_path = self.polygonLineEdit.text()
+            if not boundary_polygon_path:
+                raise ValueError("Please select a boundary polygon file.")
+        
+            study_area = gpd.read_file(boundary_polygon_path)
+
+            #r Run actual cannopy processing
+            clipped_buffer, exploded_gap_gdf = self.process_canopy_areas(canopy_gdf, study_area)
+            
+            # Load processed layers into QGIS
+            self.load_polygons_to_qgis(clipped_buffer, "Buffered Canopy Areas")
+            self.load_polygons_to_qgis(exploded_gap_gdf, "Exploded Non-Canopy Areas")
+
             QMessageBox.information(self, "Success", "LiDAR processing complete.")
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))(e)
 
     def convert_las_to_tif(self, input_las, output_tif, return_type):
+        if sys.stdout is None:
+            sys.stdout = open(os.devnull, 'w')
+        
         wbt = whitebox.WhiteboxTools()
         if return_type == "first":
             wbt.lidar_idw_interpolation(
@@ -202,11 +219,106 @@ class TreebeardDialog(treebeardDialog):
         polygons = [shape(geom) for geom, value in shapes if value == 1]
         canopy_gdf = gpd.GeoDataFrame({'geometry': polygons})
         return canopy_gdf
+    
+    def process_canopy_areas(canopy_gdf, study_area, buffer_distance=5):
+        """
+        Processes canopy areas by buffering, dissolving, clipping, and exploding the geometries.
+        Adds acreage and size category columns.
+
+        Parameters
+        ----------
+        canopy_gdf : gpd.GeoDataFrame
+            GeoDataFrame representing canopy areas.
+        study_area : gpd.GeoDataFrame
+            GeoDataFrame representing the boundary within which to clip the canopy areas.
+        buffer_distance : float, optional
+            The distance to buffer the canopy geometries. Default is 5 units.
+
+        Returns
+        -------
+        clipped_buffer : gpd.GeoDataFrame
+            GeoDataFrame with the buffered and clipped canopy areas.
+        exploded_gap_gdf : gpd.GeoDataFrame
+            GeoDataFrame with exploded geometries representing non-tree canopy areas, including acreage and size category.
+        """
+        
+        # Ensure input GeoDataFrames have CRS
+        if canopy_gdf.crs is None or study_area.crs is None:
+            raise ValueError("Input GeoDataFrames must have a CRS defined.")
+
+        # Buffer the canopy geometries
+        buffered_canopy = canopy_gdf.geometry.buffer(buffer_distance)
+
+        # Create a new GeoDataFrame with the buffered geometries
+        buffer_gdf = gpd.GeoDataFrame(geometry=buffered_canopy, crs=canopy_gdf.crs)
+
+        # Dissolve the buffered geometries into a single MultiPolygon
+        dissolved_canopy = unary_union(buffer_gdf.geometry)
+
+        # Convert the dissolved canopy back to a GeoDataFrame
+        dissolved_canopy_gdf = gpd.GeoDataFrame(geometry=[dissolved_canopy], crs=canopy_gdf.crs)
+
+        # Clip the dissolved canopy with the study area
+        clipped_buffer = gpd.overlay(dissolved_canopy_gdf, study_area, how='intersection')
+
+        # Calculate the difference between the study area and the clipped buffer
+        non_tree_canopy_gdf = gpd.overlay(study_area, clipped_buffer, how='difference')
+
+        # Explode multipart polygon to prepare for area calculations
+        exploded_gap_gdf = non_tree_canopy_gdf.explode(index_parts=True)
+
+        # Reset the index to have a clean DataFrame
+        exploded_gap_gdf.reset_index(drop=True, inplace=True)
+
+        # Calculate the area in acres (1 acre = 43,560 square feet)
+        exploded_gap_gdf['Acreage'] = exploded_gap_gdf.geometry.area / 43560
+
+        # Define a function to categorize the gap size
+        def categorize_gap_size(acres):
+            if acres < 1/8:
+                return '< 1/8 acre'
+            elif 1/8 <= acres < 1/4:
+                return '1/8 - 1/4 acre'
+            elif 1/4 <= acres < 1/2:
+                return '1/4 - 1/2 acre'
+            elif 1/2 <= acres < 1:
+                return '1/2 - 1 acre'
+            else:
+                return '> 1 acre'
+
+        # Apply the categorization function to the Acreage column
+        exploded_gap_gdf['Gap_Size_Category'] = exploded_gap_gdf['Acreage'].apply(categorize_gap_size)
+
+        return clipped_buffer, exploded_gap_gdf
 
     def browse_raster_file(self):
         self.raster_path, _ = QFileDialog.getOpenFileName(self, "Select Raster File", "", "Raster files (*.tif)")
         if self.raster_path:
             self.rasterLineEdit.setText(self.raster_path)
+    
+    def load_raster_to_qgis(self, raster_path, layer_name='Loaded Raster'):
+        """
+        Load a raster file into QGIS.
+        :param raster_path: Path to the raster file.
+        :param layer_name: Name of the QGIS layer.
+        """
+         # Check if the raster file exists
+        if not os.path.exists(raster_path):
+            QMessageBox.critical(self, "Error", f"Raster file {raster_path} does not exist.")
+            return
+        
+        # Load the raster layer
+        raster_layer = QgsRasterLayer(raster_path, layer_name)
+        
+        # Check if the raster layer is valid
+        if not raster_layer.isValid():
+            QMessageBox.critical(self, "Error", f"Failed to load raster layer from {raster_path}.")
+            return
+        
+        # Add the raster layer to the QGIS project
+        QgsProject.instance().addMapLayer(raster_layer)
+        QMessageBox.information(self, "Success", f"Raster layer '{layer_name}' loaded successfully.")
+
 
     def browse_polygon_file(self):
         self.polygon_path, _ = QFileDialog.getOpenFileName(self, "Select Boundary Polygon File", "", "Vector files (*.shp *.geojson)")
