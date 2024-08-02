@@ -1,6 +1,7 @@
 # Utility methods used in processing LIDAR .las files into canopy gaps
 import numpy as np
 import os
+import re
 
 import laspy
 import rioxarray as rxr
@@ -281,13 +282,8 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
 
         las_path = os.path.join(las_folder_path, las_file)
 
-        # Open the LAS file with laspy to read the header and get the CRS information
-        with laspy.open(las_path) as las:
-            header = las.header
-            epsg_crs = header.parse_crs().to_epsg()
-        
-        if epsg_crs is None:
-            raise ValueError(f"Could not determine EPSG code from LAS file: {las_path}")
+        las_file = laspy.read(las_path)
+        crs_wkt = las_file.header.parse_crs().to_wkt()
 
         wbt = whitebox.WhiteboxTools()
 
@@ -330,8 +326,8 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
         canopy_dem.values[canopy_dem < canopy_height] = 0
         canopy_dem.values[canopy_dem > canopy_height] = 1
         canopy_dem = canopy_dem.round()
-        canopy_dem = canopy_dem.rio.write_crs(f"EPSG:{epsg_crs}", inplace=True)
-        canopy_dem = canopy_dem.rio.reproject(CRS.from_epsg(4326))
+        canopy_dem = canopy_dem.rio.write_crs(crs_wkt, inplace=True)
+        #canopy_dem = canopy_dem.rio.reproject(CRS.from_epsg(4326))
         canopy_dem = canopy_dem.astype('float64')
         nodata_value = canopy_dem.rio.nodata
         if nodata_value is not None:
@@ -363,7 +359,7 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
         canopy_gdf = canopy_gdf.set_crs(canopy_merged.rio.crs)
 
     # Reproject to EPSG: the identified CRS
-    canopy_gdf = canopy_gdf.to_crs(epsg=epsg_crs)
+    canopy_gdf = canopy_gdf.to_crs(crs_wkt)
 
     return canopy_gdf
 
