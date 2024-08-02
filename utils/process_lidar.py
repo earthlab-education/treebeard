@@ -1,8 +1,12 @@
 # Utility methods used in processing LIDAR .las files into canopy gaps
 import numpy as np
+import os
 
-import rioxarray
+import laspy
+import rioxarray as rxr
+import rioxarray.merge as rxrm
 import rasterio
+from rasterio.crs import CRS
 import geopandas as gpd
 from shapely.geometry import shape
 from scipy.ndimage import binary_opening, binary_closing
@@ -220,3 +224,147 @@ def process_canopy_areas(canopy_gdf, study_area, buffer_distance=5):
     exploded_gap_gdf['Gap_Size_Category'] = exploded_gap_gdf['Acreage'].apply(categorize_gap_size)
 
     return clipped_buffer, exploded_gap_gdf
+
+def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5):
+    """
+    Processes LIDAR data to generate a canopy height GeoDataFrame for a specific project area.
+
+    This function performs the following steps:
+    1. Lists all LAS files in the specified directory.
+    2. Processes each LAS file to create DEMs from first and ground returns.
+    3. Generates a canopy height DEM by subtracting the ground return DEM from the first return DEM.
+    4. Classifies the canopy height into binary values (1 for canopy, 0 for no canopy).
+    5. Merges and clips the processed DEMs to the specified project area.
+    6. Converts the binary canopy mask into polygons and returns a GeoDataFrame of canopy areas.
+
+    Parameters
+    ----------
+    sa_name : str
+        The name of the study area or project area.
+    proj_area : GeoDataFrame
+        A GeoDataFrame containing the geometry of the project area to which the output will be clipped.
+    las_folder_path : str
+        The path to the directory containing the LAS files to be processed.
+    canopy_height : float, optional
+        The height threshold to classify canopy vs. no canopy. 
+        All values greater than or equal to this threshold will be considered canopy (default is 5).
+
+    Returns
+    -------
+    canopy_gdf : GeoDataFrame
+        A GeoDataFrame containing polygons representing canopy areas in the specified project area.
+
+    Notes
+    -----
+    - The function assumes that the LAS files are in the EPSG:6430 coordinate system.
+    - The output GeoDataFrame is reprojected to EPSG:6430.
+
+    Examples
+    --------
+    >>> sa_name = "Conifer_Hill"
+    >>> proj_area = gpd.read_file("path/to/project_area.shp")
+    >>> las_folder_path = "path/to/las_files"
+    >>> output_fr_tif = "path/to/output_fr.tif"
+    >>> output_gr_tif = "path/to/output_gr.tif"
+    >>> canopy_gdf = process_lidar_to_canopy(sa_name, proj_area, las_folder_path, output_fr_tif, output_gr_tif)
+    >>> print(canopy_gdf.head())
+    """
+    # List all .tif files in the directory
+    las_files = [file for file in os.listdir(las_folder_path) if file.endswith('.las')]
+
+    tile_agg = []
+
+    for las in las_files:
+        # Process LAS file to TIFF for first and ground returns
+
+        las_filename = os.path.splitext(las_file)[0]
+
+        las_path = os.path.join(las_folder_path, las)
+
+        # Open the LAS file with laspy to read the header and get the CRS information
+        with laspy.open(las_path) as las_file:
+            header = las_file.header
+            epsg_crs = header.parse_crs().to_epsg()
+        
+        if epsg_crs is None:
+            raise ValueError(f"Could not determine EPSG code from LAS file: {las_path}")
+
+        wbt = whitebox.WhiteboxTools()
+
+        output_fr_tif = os.path.join(
+            las_folder_path,
+            las_filename +'_fr.tif'
+        )
+        output_gr_tif = os.path.join(
+            las_folder_path,
+            las_filename +'_gr.tif'
+        )
+
+        first_return = wbt.lidar_idw_interpolation(
+            i=las,
+            output=output_fr_tif,
+            parameter="elevation",
+            returns="first",
+            resolution=1.0,
+            radius=3.0
+        )
+        ground_return = wbt.lidar_idw_interpolation(
+            i=las,
+            output=output_gr_tif,
+            parameter="elevation",
+            returns="ground",
+            resolution=1.0,
+            radius=3.0
+        )
+
+        fr_dem = rxr.open_rasterio(output_fr_tif)
+
+        gr_dem = rxr.open_rasterio(output_gr_tif)
+
+        # Generate canopy DEM
+        canopy_dem = fr_dem - gr_dem
+
+        # Set all values greater than 5 (canopy) to 1 and all values less than 5 (no canopy) to 0
+        # Modify this value to adjust canopy height sensitivity
+        # Process individual LIDAR tiles and prep for merge
+        canopy_dem.values[canopy_dem < canopy_height] = 0
+        canopy_dem.values[canopy_dem > canopy_height] = 1
+        canopy_dem = canopy_dem.round()
+        canopy_dem = canopy_dem.rio.write_crs(f"EPSG:{epsg_crs}", inplace=True)
+        canopy_dem = canopy_dem.rio.reproject(CRS.from_epsg(4326))
+        canopy_dem = canopy_dem.astype('float64')
+        nodata_value = canopy_dem.rio.nodata
+        if nodata_value is not None:
+            canopy_dem = canopy_dem.where(~np.isclose(canopy_dem, nodata_value), 0)
+        canopy_dem.rio.write_nodata(0, inplace=True)
+        canopy_dem = canopy_dem.astype('int32')
+        tile_agg.append(canopy_dem)
+    # Merge all processed tiles
+    canopy_merged = rxrm.merge_arrays(tile_agg).rio.clip(proj_area.geometry)
+    canopy_merged.name = sa_name + "_Canopy"
+    binary_mask = canopy_merged.squeeze()  # Assuming the data is in the first band
+
+    # Create a mask where cell values are 1
+    mask = binary_mask == 1
+
+    # Get the affine transform from the raster data
+    transform = binary_mask.rio.transform()
+
+    # Extract shapes (polygons) from the binary mask
+    shapes = rasterio.features.shapes(mask.astype(np.int16).values, transform=transform)
+    polygons = [shape(geom) for geom, value in shapes if value == 1]
+
+    # Create a GeoDataFrame from the polygons
+    canopy_gdf = gpd.GeoDataFrame({'geometry': polygons})
+
+    crs = canopy_merged.rio.crs
+
+    if canopy_gdf.crs is None:
+        canopy_gdf = canopy_gdf.set_crs(canopy_merged.rio.crs)
+
+    # Reproject to EPSG: the identified CRS
+    canopy_gdf = canopy_gdf.to_crs(epsg=epsg_crs)
+
+    return canopy_gdf
+
+
