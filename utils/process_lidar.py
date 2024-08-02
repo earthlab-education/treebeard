@@ -274,16 +274,16 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
 
     tile_agg = []
 
-    for las in las_files:
+    for las_file in las_files:
         # Process LAS file to TIFF for first and ground returns
 
         las_filename = os.path.splitext(las_file)[0]
 
-        las_path = os.path.join(las_folder_path, las)
+        las_path = os.path.join(las_folder_path, las_file)
 
         # Open the LAS file with laspy to read the header and get the CRS information
-        with laspy.open(las_path) as las_file:
-            header = las_file.header
+        with laspy.open(las_path) as las:
+            header = las.header
             epsg_crs = header.parse_crs().to_epsg()
         
         if epsg_crs is None:
