@@ -271,12 +271,21 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
     >>> print(canopy_gdf.head())
     """
     # List all .tif files in the directory
-    las_files = [file for file in os.listdir(las_folder_path) if file.endswith('.las')]
+    las_files = [os.path.join(las_folder_path, file) for file in os.listdir(las_folder_path) if file.endswith('.las')]
+
+    output_folder_path = os.path.join(las_folder_path, "output")
+
+    if not os.path.exists(output_folder_path):
+        os.makedirs(output_folder_path)
+        print(f"'output' folder created at: {output_folder_path}")
+    else:
+        print(f"'output' folder already exists at: {output_folder_path}")
 
     tile_agg = []
 
     for las_file in las_files:
         # Process LAS file to TIFF for first and ground returns
+        print(las_file)
 
         las_filename = os.path.splitext(las_file)[0]
 
@@ -289,15 +298,17 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
 
         output_fr_tif = os.path.join(
             las_folder_path,
+            "output",
             las_filename +'_fr.tif'
         )
         output_gr_tif = os.path.join(
             las_folder_path,
+            "output",
             las_filename +'_gr.tif'
         )
 
         first_return = wbt.lidar_idw_interpolation(
-            i=las,
+            i=las_file,
             output=output_fr_tif,
             parameter="elevation",
             returns="first",
@@ -305,7 +316,7 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
             radius=3.0
         )
         ground_return = wbt.lidar_idw_interpolation(
-            i=las,
+            i=las_file,
             output=output_gr_tif,
             parameter="elevation",
             returns="ground",
