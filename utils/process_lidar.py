@@ -155,7 +155,7 @@ def export_lidar_canopy_tif(lidar_cleaned, output_path):
 # canopy_gdf = export_lidar_canopy_tif(lidar_cleaned, output_path)
 
 # Method to process canopy gaps.
-def process_canopy_areas(canopy_gdf, study_area, buffer_distance=5):
+def process_canopy_areas(canopy_gdf, study_area, output_path, buffer_distance=5):
     """
     Processes canopy areas by buffering, dissolving, clipping, and exploding the geometries.
     Adds acreage and size category columns.
@@ -166,6 +166,8 @@ def process_canopy_areas(canopy_gdf, study_area, buffer_distance=5):
         GeoDataFrame representing canopy areas.
     study_area : gpd.GeoDataFrame
         GeoDataFrame representing the boundary within which to clip the canopy areas.
+    output_path : path
+        File path to output processed shapefiles
     buffer_distance : float, optional
         The distance to buffer the canopy geometries. Default is 5 units.
 
@@ -224,9 +226,16 @@ def process_canopy_areas(canopy_gdf, study_area, buffer_distance=5):
     # Apply the categorization function to the Acreage column
     exploded_gap_gdf['Gap_Size_Category'] = exploded_gap_gdf['Acreage'].apply(categorize_gap_size)
 
-    return clipped_buffer, exploded_gap_gdf
+    # Output shapefiles
+    proj_area_name = study_area['Proj_ID']
+    canopy_gaps_calced_path = os.path.join(output_path+'\\lidar_'+ proj_area_name + '_canopy_gaps_calced.shp')
+    exploded_gap_gdf.to_file(canopy_gaps_calced_path)
+    dissolved_canopy_gdf = os.path.join(output_path+'\\lidar_'+ proj_area_name + '_canopy.shp')
+    canopy_gdf.to_file(dissolved_canopy_gdf)
+    buffered_canopy_path = os.path.join(output_path+'\\lidar_'+ proj_area_name + '_buffered_canopy.shp')
+    clipped_buffer[0].to_file(buffered_canopy_path)
 
-def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5):
+def process_lidar_to_canopy(proj_area, las_folder_path, canopy_height=5):
     """
     Processes LIDAR data to generate a canopy height GeoDataFrame for a specific project area.
 
@@ -240,8 +249,6 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
 
     Parameters
     ----------
-    sa_name : str
-        The name of the study area or project area.
     proj_area : GeoDataFrame
         A GeoDataFrame containing the geometry of the project area to which the output will be clipped.
     las_folder_path : str
@@ -262,12 +269,11 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
 
     Examples
     --------
-    >>> sa_name = "Conifer_Hill"
     >>> proj_area = gpd.read_file("path/to/project_area.shp")
     >>> las_folder_path = "path/to/las_files"
     >>> output_fr_tif = "path/to/output_fr.tif"
     >>> output_gr_tif = "path/to/output_gr.tif"
-    >>> canopy_gdf = process_lidar_to_canopy(sa_name, proj_area, las_folder_path, output_fr_tif, output_gr_tif)
+    >>> canopy_gdf = process_lidar_to_canopy(proj_area, las_folder_path, output_fr_tif, output_gr_tif)
     >>> print(canopy_gdf.head())
     """
     # List all .tif files in the directory
@@ -288,11 +294,12 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
         print(las_file)
 
         las_filename = os.path.splitext(las_file)[0]
+        las_filename = las_filename + ".las"
 
-        las_path = os.path.join(las_folder_path, las_file)
-
-        las_file = laspy.read(las_path)
+        las_file = laspy.read(las_filename)
         crs_wkt = las_file.header.parse_crs().to_wkt()
+        print(crs_wkt)
+        proj_area = proj_area.to_crs(crs_wkt)
 
         wbt = whitebox.WhiteboxTools()
 
@@ -308,7 +315,7 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
         )
 
         first_return = wbt.lidar_idw_interpolation(
-            i=las_file,
+            i=las_filename,
             output=output_fr_tif,
             parameter="elevation",
             returns="first",
@@ -316,7 +323,7 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
             radius=3.0
         )
         ground_return = wbt.lidar_idw_interpolation(
-            i=las_file,
+            i=las_filename,
             output=output_gr_tif,
             parameter="elevation",
             returns="ground",
@@ -348,7 +355,6 @@ def process_lidar_to_canopy(sa_name, proj_area, las_folder_path, canopy_height=5
         tile_agg.append(canopy_dem)
     # Merge all processed tiles
     canopy_merged = rxrm.merge_arrays(tile_agg).rio.clip(proj_area.geometry)
-    canopy_merged.name = sa_name + "_Canopy"
     binary_mask = canopy_merged.squeeze()  # Assuming the data is in the first band
 
     # Create a mask where cell values are 1
