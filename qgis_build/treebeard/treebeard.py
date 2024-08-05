@@ -1,14 +1,12 @@
 import os
 import sys
 
-import fiona
 import geopandas as gpd
 import numpy as np
 from qgis.PyQt.QtWidgets import QFileDialog, QDialog, QAction, QMessageBox
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import QgsProject, QgsRasterLayer, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry
 from PyQt5.QtCore import QVariant, QCoreApplication
-import pyogrio
 import requests
 import rioxarray
 import rasterio
@@ -26,6 +24,23 @@ from .treebeard_dialog import treebeardDialog
 from .import_lidar_dialog import Ui_import_lidar_dialog as ImportLidarDialog
 from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
 from .process_lidar import convert_las_to_tif, clean_raster_rioxarray, export_lidar_canopy_tif, process_canopy_areas
+
+COLO_CRS = "EPSG:6430"
+
+def ensure_crs(geodf, target_crs=COLO_CRS):
+    """Ensure the GeoDataFrame is in the specified CRS."""
+    if geodf.crs =  None:
+        geodf = geodf.rio.write_crs(target_crs)
+
+    elif geodf.crs != target_crs:
+        geodf = geodf.to_crs(target_crs)
+    return geodf
+
+def ensure_raster_crs(raster, target_crs=COLO_CRS):
+    """Ensure the raster is in the specified CRS."""
+    if raster.rio.crs != target_crs:
+        raster = raster.rio.reproject(target_crs)
+    return raster
 
 
 class TreebeardDialog(treebeardDialog):
@@ -148,6 +163,16 @@ class TreebeardDialog(treebeardDialog):
             convert_las_to_tif(lidar_file, output_tif, 'first')
             lidar_cleaned = clean_raster_rioxarray(rioxarray.open_rasterio(output_tif))
             canopy_gdf = export_lidar_canopy_tif(lidar_cleaned, output_tif)
+ 
+             # Ensure CRS for both raster and vector data
+            canopy_gdf = ensure_crs(canopy_gdf)
+            study_area = gpd.read_file(self.polygonLineEdit.text())
+            study_area = ensure_crs(study_area)
+
+            # Further processing
+            clipped_buffer, exploded_gap_gdf = process_canopy_areas(canopy_gdf, study_area)
+
+            # Load raster to QGIS
             self.load_raster_to_qgis(output_tif, 'Processed LiDAR Canopy')
             QMessageBox.information(self, "Success", "LiDAR processing complete.")
         except Exception as e:

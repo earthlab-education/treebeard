@@ -1,5 +1,7 @@
 # Utility methods used in processing LIDAR .las files into canopy gaps
 import numpy as np
+import os
+import sys
 
 import rioxarray
 import rasterio
@@ -24,6 +26,9 @@ def convert_las_to_tif(input_las, output_tif, return_type):
     return_type : str
         Type of returns to process. Must be either 'first' for first returns or 'ground' for ground returns.
     """
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, 'w')
+
     wbt = whitebox.WhiteboxTools()
 
     # Process LAS file to TIFF based on return type
