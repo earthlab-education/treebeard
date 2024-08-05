@@ -178,7 +178,9 @@ def process_canopy_areas(canopy_gdf, study_area, output_path, buffer_distance=5)
     exploded_gap_gdf : gpd.GeoDataFrame
         GeoDataFrame with exploded geometries representing non-tree canopy areas, including acreage and size category.
     """
-    
+    # Ensure study area CRS is the same as the processed canopy CRS (should be in Feet)
+    study_area = study_area.to_crs(canopy_gdf.crs)
+
     # Ensure input GeoDataFrames have CRS
     if canopy_gdf.crs is None or study_area.crs is None:
         raise ValueError("Input GeoDataFrames must have a CRS defined.")
@@ -227,13 +229,13 @@ def process_canopy_areas(canopy_gdf, study_area, output_path, buffer_distance=5)
     exploded_gap_gdf['Gap_Size_Category'] = exploded_gap_gdf['Acreage'].apply(categorize_gap_size)
 
     # Output shapefiles
-    proj_area_name = study_area['Proj_ID']
-    canopy_gaps_calced_path = os.path.join(output_path+'\\lidar_'+ proj_area_name + '_canopy_gaps_calced.shp')
+    proj_area_name = str(study_area['Proj_ID'].iloc[0])
+    canopy_gaps_calced_path = os.path.join(output_path,'lidar_'+ proj_area_name + '_canopy_gaps_calced.shp')
     exploded_gap_gdf.to_file(canopy_gaps_calced_path)
-    dissolved_canopy_gdf = os.path.join(output_path+'\\lidar_'+ proj_area_name + '_canopy.shp')
+    dissolved_canopy_gdf = os.path.join(output_path, 'lidar_'+ proj_area_name + '_canopy.shp')
     canopy_gdf.to_file(dissolved_canopy_gdf)
-    buffered_canopy_path = os.path.join(output_path+'\\lidar_'+ proj_area_name + '_buffered_canopy.shp')
-    clipped_buffer[0].to_file(buffered_canopy_path)
+    buffered_canopy_path = os.path.join(output_path,'lidar_'+ proj_area_name + '_buffered_canopy.shp')
+    clipped_buffer.to_file(buffered_canopy_path)
 
 def process_lidar_to_canopy(proj_area, las_folder_path, canopy_height=5):
     """
