@@ -59,10 +59,16 @@ class TreebeardDialog(treebeardDialog):
         self.raster_path = ""
         self.polygon_path = ""
         self.lidar_path = ""
+        self.output_dir = ""
 
     def set_proj_dir(self):
         """Sets folder for output files"""
-    pass
+        directory = QFileDialog.getExistingDiretory(self, "Select Output Directory")
+
+        if directory:
+            self.output_dir = directory
+            self.outputLineEdit.setText(self.output_dir)
+
     
     def show_import_raster_dialog(self):
         dialog = QDialog()
