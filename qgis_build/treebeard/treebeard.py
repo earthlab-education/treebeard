@@ -20,27 +20,30 @@ import sys
 import os
 
 
-from .treebeard_dialog import treebeardDialog
+from .treebeard_dialog_base import treebeardDialog
 from .import_lidar_dialog import Ui_import_lidar_dialog as ImportLidarDialog
 from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
-from .process_lidar import convert_las_to_tif, clean_raster_rioxarray, export_lidar_canopy_tif, process_canopy_areas
+from .process_lidar import  process_canopy_areas, process_lidar_to_canopy
 
 COLO_CRS = "EPSG:6430"
 
-def ensure_crs(geodf, target_crs=COLO_CRS):
-    """Ensure the GeoDataFrame is in the specified CRS."""
-    if geodf.crs =  None:
-        geodf = geodf.rio.write_crs(target_crs)
+# def ensure_crs(geodf, target_crs=COLO_CRS):
+#     """Ensure the GeoDataFrame is in the specified CRS."""
+#     if geodf.crs =  None:
+#         geodf = geodf.rio.write_crs(target_crs)
 
-    elif geodf.crs != target_crs:
-        geodf = geodf.to_crs(target_crs)
-    return geodf
+#     elif geodf.crs != target_crs:
+#         geodf = geodf.to_crs(target_crs)
+#     return geodf
 
-def ensure_raster_crs(raster, target_crs=COLO_CRS):
-    """Ensure the raster is in the specified CRS."""
-    if raster.rio.crs != target_crs:
-        raster = raster.rio.reproject(target_crs)
-    return raster
+# def ensure_raster_crs(raster, target_crs=COLO_CRS):
+#     """Ensure the raster is in the specified CRS."""
+#     if raster.rio.crs != target_crs:
+#         raster = raster.rio.reproject(target_crs)
+#     return raster
+
+def convert_boundary_to_gdf(boundary_path, crs):
+    """Load in boundary file to make sure it is in gdf format before processing """
 
 
 class TreebeardDialog(treebeardDialog):
@@ -49,14 +52,18 @@ class TreebeardDialog(treebeardDialog):
         super(TreebeardDialog, self).__init__(parent)
         self.browseRasterButton.clicked.connect(self.show_import_raster_dialog)
         self.browsePolygonButton.clicked.connect(self.browse_polygon_file)
-        self.processButton.clicked.connect(self.process_files)
+        self.processButton.clicked.connect(self.process_kmeans)
         self.browseLidarButton.clicked.connect(self.show_import_lidar_dialog)
         self.processCanopyButton.clicked.connect(self.process_lidar_data)
+        self.defineProjectDir.clicked.connect(self.set_proj_dir)
         self.raster_path = ""
         self.polygon_path = ""
         self.lidar_path = ""
 
-
+    def set_proj_dir(self):
+        """Sets folder for output files"""
+    pass
+    
     def show_import_raster_dialog(self):
         dialog = QDialog()
         ui =  ImportLidarDialog()
@@ -83,8 +90,8 @@ class TreebeardDialog(treebeardDialog):
         selection = ui.importRasterComboBox.currentText()
         if selection == "Import from QGIS Layer":
             self.raster_path = self.import_from_qgis_layer()
-        elif selection == "Import from Dataset":
-            self.raster_path = self.download_from_dataset()
+        # elif selection == "Import from Dataset":
+        #     self.raster_path = self.download_from_dataset()
         elif selection == "Import from Desktop":
             self.raster_path, _ = QFileDialog.getOpenFileName(dialog, "Select Raster File", "", "Raster files (*.tif)")
         dialog.accept()
@@ -93,41 +100,41 @@ class TreebeardDialog(treebeardDialog):
         selection = ui.importLidarComboBox.currentText()
         if selection == "Import from QGIS Layer":
             self.lidar_path = self.import_from_qgis_layer()
-        elif selection == "Import from Dataset":
-            self.lidar_path = self.download_from_dataset()
+        # elif selection == "Import from Dataset":
+        #     self.lidar_path = self.download_from_dataset()
         elif selection == "Import from Desktop":
             self.lidar_path, _ = QFileDialog.getOpenFileName(dialog, "Select LiDAR File", "", "LiDAR files (*.las)")
         dialog.accept()
     
-    def download_lidar_files(self, tiles_by_area, lidar_las_dir):
-        las_root_url = 'https://lidararchive.s3.amazonaws.com/2020_CSPN_Q2/'
-        canopy_dict = {}
+    # def download_lidar_files(self, tiles_by_area, lidar_las_dir):
+    #     las_root_url = 'https://lidararchive.s3.amazonaws.com/2020_CSPN_Q2/'
+    #     canopy_dict = {}
         
-        if not self.boundary_polygon_path:
-            QMessageBox.critical(None, "Error", "Please import a boundary polygon first.")
-            return
+    #     if not self.boundary_polygon_path:
+    #         QMessageBox.critical(None, "Error", "Please import a boundary polygon first.")
+    #         return
 
-        proj_area_gdf = gpd.read_file(self.boundary_polygon_path)
-        site_to_process = tiles_by_area[tiles_by_area['Proj_ID'] == 'Zumwinkel'].copy()
-        for index, row in site_to_process.iterrows():
-            tiles = row['tile']
-            proj_area_name = row['Proj_ID']
-            sel_proj_area_gdf = proj_area_gdf[proj_area_gdf['Proj_ID'] == proj_area_name]
-            tile_agg = []
-            print("Processing LIDAR for " + proj_area_name)
-            for tile in tiles:
-                file_name = tile + ".las"
-                print("Processing LIDAR tile " + tile)
-                tile_path = os.path.join(lidar_las_dir, file_name)
-                download_url = las_root_url + tile + ".las"
-                if not os.path.exists(tile_path):
-                    response = requests.get(download_url)
-                    if response.status_code == 200:
-                        with open(tile_path, 'wb') as file:
-                            file.write(response.content)
-                        print(f"File downloaded successfully and saved to {tile_path}")
-                    else:
-                        print(f"Failed to download file. Status code: {response.status_code}")
+    #     proj_area_gdf = gpd.read_file(self.boundary_polygon_path)
+    #     site_to_process = tiles_by_area[tiles_by_area['Proj_ID'] == 'Zumwinkel'].copy()
+    #     for index, row in site_to_process.iterrows():
+    #         tiles = row['tile']
+    #         proj_area_name = row['Proj_ID']
+    #         sel_proj_area_gdf = proj_area_gdf[proj_area_gdf['Proj_ID'] == proj_area_name]
+    #         tile_agg = []
+    #         print("Processing LIDAR for " + proj_area_name)
+    #         for tile in tiles:
+    #             file_name = tile + ".las"
+    #             print("Processing LIDAR tile " + tile)
+    #             tile_path = os.path.join(lidar_las_dir, file_name)
+    #             download_url = las_root_url + tile + ".las"
+    #             if not os.path.exists(tile_path):
+    #                 response = requests.get(download_url)
+    #                 if response.status_code == 200:
+    #                     with open(tile_path, 'wb') as file:
+    #                         file.write(response.content)
+    #                     print(f"File downloaded successfully and saved to {tile_path}")
+    #                 else:
+    #                     print(f"Failed to download file. Status code: {response.status_code}")
 
     def browse_polygon_file(self):
         """Browse and select a boundary polygon file."""
@@ -135,18 +142,13 @@ class TreebeardDialog(treebeardDialog):
         if self.polygon_path:
             self.polygonLineEdit.setText(self.polygon_path)
 
-    def process_files(self):
-        """Process the selected files."""
-        if not self.raster_path or not self.polygon_path:
-            QMessageBox.critical(self, "Error", "Please select both raster and polygon files.")
-            return
-        # Add processing logic here
+    # def process_files(self):
+    #     """Process the selected files."""
+    #     if not self.raster_path or not self.polygon_path:
+    #         QMessageBox.critical(self, "Error", "Please select both raster and polygon files.")
+    #         return
+    #     # Add processing logic here
 
-    def load_from_qgis_layer(self):
-        pass
-
-    def download_from_dataset(self):
-        pass
 
     def load_from_pc(self):
         self.lidar_path, _ = QFileDialog.getOpenFileName(self, "Select LiDAR File", "", "LAS files (*.las *.laz)")
@@ -159,21 +161,33 @@ class TreebeardDialog(treebeardDialog):
             QMessageBox.critical(self, "Error", "Please select a LiDAR file.")
             return
         try:
-            output_tif = os.path.join(os.path.dirname(lidar_file), 'processed_lidar.tif')
-            convert_las_to_tif(lidar_file, output_tif, 'first')
-            lidar_cleaned = clean_raster_rioxarray(rioxarray.open_rasterio(output_tif))
-            canopy_gdf = export_lidar_canopy_tif(lidar_cleaned, output_tif)
+            # code from for_chris 
+            canopy_gdf = process_lidar_to_canopy(proj_area, las_folder_path, canopy_height=5)
+
+            # Specify the output path from QGIS parameter? Or default to the earth analytics folder
+            output_path = os.path.join(lidar_las_dir, "output")
+
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+
+            process_canopy_areas(canopy_gdf, proj_area, output_path, buffer_distance=5)
+
+
+            # output_tif = os.path.join(os.path.dirname(lidar_file), 'processed_lidar.tif')
+            # convert_las_to_tif(lidar_file, output_tif, 'first')
+            # lidar_cleaned = clean_raster_rioxarray(rioxarray.open_rasterio(output_tif))
+            # canopy_gdf = export_lidar_canopy_tif(lidar_cleaned, output_tif)
  
-             # Ensure CRS for both raster and vector data
-            canopy_gdf = ensure_crs(canopy_gdf)
-            study_area = gpd.read_file(self.polygonLineEdit.text())
-            study_area = ensure_crs(study_area)
+            #  # Ensure CRS for both raster and vector data
+            # canopy_gdf = ensure_crs(canopy_gdf)
+            # study_area = gpd.read_file(self.polygonLineEdit.text())
+            # study_area = ensure_crs(study_area)
 
-            # Further processing
-            clipped_buffer, exploded_gap_gdf = process_canopy_areas(canopy_gdf, study_area)
+            # # Further processing
+            # clipped_buffer, exploded_gap_gdf = process_canopy_areas(canopy_gdf, study_area)
 
-            # Load raster to QGIS
-            self.load_raster_to_qgis(output_tif, 'Processed LiDAR Canopy')
+            # # Load raster to QGIS
+            # self.load_raster_to_qgis(output_tif, 'Processed LiDAR Canopy')
             QMessageBox.information(self, "Success", "LiDAR processing complete.")
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
@@ -230,7 +244,12 @@ class TreebeardDialog(treebeardDialog):
             pr.addFeatures([feat])
         QgsProject.instance().addMapLayer(vl)
         print(f"Layer '{layer_name}' added to QGIS.")
+    
+    def process_kmeans(self, boundary_gdf, aoi_raster):
+        """Run kmeans processing from segment_drapp"""
 
+    pass    
+    
     def calculate_spatial_statistics(self, gdf):
         stats = gdf['geometry'].area.describe()
         print("Spatial Statistics:")
