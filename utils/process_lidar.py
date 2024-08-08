@@ -14,146 +14,6 @@ from scipy.ndimage import binary_opening, binary_closing
 from shapely.ops import unary_union
 import whitebox
 
-# Process LAS files to canopy using Whitebox
-def convert_las_to_tif(input_las, output_tif, return_type):
-    """
-    Converts a LAS file to a GeoTIFF using WhiteboxTools, based on the specified return type,
-    processes it in a temporary file, sets the CRS to the specified EPSG code, and saves it to the output path.
-
-    Parameters
-    ----------
-    input_las : str
-        Path to the input LAS file.
-    output_tif : str
-        Path to save the output GeoTIFF file.
-    return_type : str
-        Type of returns to process. Must be either 'first' for first returns or 'ground' for ground returns.
-    """
-    wbt = whitebox.WhiteboxTools()
-
-    # Process LAS file to TIFF based on return type
-    if return_type == "first":
-        wbt.lidar_idw_interpolation(
-            i=input_las,
-            output=output_tif,
-            parameter="elevation",
-            returns="first",
-            resolution=1.0,
-            radius=3.0
-        )
-    elif return_type == "ground":
-        wbt.lidar_idw_interpolation(
-            i=input_las,
-            output=output_tif,
-            parameter="elevation",
-            returns="ground",
-            resolution=1.0,
-            radius=3.0
-        )
-    else:
-        raise ValueError("Invalid return_type. Use 'first' or 'ground'.")
-
-    
-# Function to apply morphological operations on a rioxarray DataArray
-def clean_raster_rioxarray(raster_xarray, operation='opening', structure_size=3):
-    """
-    Cleans up "noise" in the canopy/gap raster with opening/closing morphological operations
-
-    Parameters
-    ----------
-    raster_xarray : xarray.DataArray
-        The input raster data as an xarray DataArray.
-    operation : str, optional
-        The morphological operation to apply. Must be either 'opening' or 'closing'. Default is 'opening'.
-    structure_size : int, optional
-        The size of the structure element for the morphological operation. Default is 3.
-
-    Returns
-    -------
-    cleaned_raster_xarray : xarray.DataArray
-        The cleaned raster data as an xarray DataArray.
-
-    Raises
-    ------
-    ValueError
-        If the operation is not 'opening' or 'closing'.
-
-    Examples
-    --------
-    >>> cleaned_raster = clean_raster_rioxarray(raster_xarray, operation='opening', structure_size=3)
-    """
-    # Extract the numpy array from the xarray DataArray
-    raster_data = raster_xarray.values
-
-    # Ensure the raster_data is 2D (in case it's a single-band raster with an extra dimension)
-    if raster_data.ndim == 3 and raster_data.shape[0] == 1:
-        raster_data = raster_data[0, :, :]
-    
-    # Convert to binary (tree canopy is represented by 1, no canopy by 0)
-    binary_raster = raster_data == 1
-
-    # Define the structure for the morphological operation
-    structure = np.ones((structure_size, structure_size), dtype=int)
-
-    # Apply the chosen morphological operation
-    if operation == 'opening':
-        cleaned_raster = binary_opening(binary_raster, structure=structure)
-    elif operation == 'closing':
-        cleaned_raster = binary_closing(binary_raster, structure=structure)
-    else:
-        raise ValueError("Operation must be 'opening' or 'closing'")
-
-    # Convert back to the original values (1 for canopy, 0 for no canopy)
-    raster_data_cleaned = np.where(cleaned_raster, 1, 0)
-
-    # Add back the extra dimension if the original data had it
-    if raster_xarray.values.ndim == 3:
-        raster_data_cleaned = np.expand_dims(raster_data_cleaned, axis=0)
-
-    # Create a new xarray DataArray with the cleaned data, copying metadata from the original
-    cleaned_raster_xarray = raster_xarray.copy(data=raster_data_cleaned)
-
-    return cleaned_raster_xarray
-
-
-def export_lidar_canopy_tif(lidar_cleaned, output_path):
-    """
-    Exports the cleaned lidar canopy data to a GeoTIFF file and generates a GeoDataFrame of canopy polygons.
-    
-    Parameters:
-    - lidar_cleaned: xarray.DataArray containing the cleaned lidar canopy data.
-    - output_path: str, the path where the GeoTIFF file will be saved.
-    
-    Returns:
-    - canopy_gdf: GeoDataFrame containing the canopy polygons.
-    """
-    # Export the lidar canopy tif to the specified path
-    lidar_cleaned = lidar_cleaned.where(lidar_cleaned != 1.7976931348623157e+308, np.nan)
-    lidar_cleaned.rio.to_raster(output_path, overwrite=True)
-    
-    # Load the TIF file using rioxarray
-    binary_mask = lidar_cleaned.squeeze()  # Assuming the data is in the first band
-    
-    # Create a mask where cell values are 1
-    mask = binary_mask == 1
-    
-    # Get the affine transform from the raster data
-    transform = binary_mask.rio.transform()
-    
-    # Extract shapes (polygons) from the binary mask
-    shapes = rasterio.features.shapes(mask.astype(np.int16).values, transform=transform)
-    polygons = [shape(geom) for geom, value in shapes if value == 1]
-    
-    # Create a GeoDataFrame from the polygons
-    canopy_gdf = gpd.GeoDataFrame({'geometry': polygons})
-    
-    return canopy_gdf
-
-# Example usage:
-# lidar_cleaned = ... # Load your xarray.DataArray here
-# output_path = "../notebooks/lidar_clean_canopy.tif"
-# canopy_gdf = export_lidar_canopy_tif(lidar_cleaned, output_path)
-
 # Method to process canopy gaps.
 def process_canopy_areas(canopy_gdf, study_area, output_path, buffer_distance=5):
     """
@@ -295,8 +155,8 @@ def process_lidar_to_canopy(proj_area, las_folder_path, canopy_height=5):
         # Process LAS file to TIFF for first and ground returns
         print(las_file)
 
-        las_filename = os.path.splitext(las_file)[0]
-        las_filename = las_filename + ".las"
+        las_filename_no_ext = os.path.splitext(las_file)[0]
+        las_filename = las_filename_no_ext + ".las"
 
         las_file = laspy.read(las_filename)
         crs_wkt = las_file.header.parse_crs().to_wkt()
@@ -308,12 +168,12 @@ def process_lidar_to_canopy(proj_area, las_folder_path, canopy_height=5):
         output_fr_tif = os.path.join(
             las_folder_path,
             "output",
-            las_filename +'_fr.tif'
+            las_filename_no_ext +'_fr.tif'
         )
         output_gr_tif = os.path.join(
             las_folder_path,
             "output",
-            las_filename +'_gr.tif'
+            las_filename_no_ext +'_gr.tif'
         )
 
         first_return = wbt.lidar_idw_interpolation(
