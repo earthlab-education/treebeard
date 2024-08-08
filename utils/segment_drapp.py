@@ -497,7 +497,6 @@ def bin_plot(gdf, bins, labels, title, filepath=None, save_png_file=False):
     ax.set_title(title)
     plt.tight_layout()
     filename = title.split('.')[0]
-    plt.savefig(f'{filename}.png')
 
     if save_png_file:
         plt.savefig(filepath)
