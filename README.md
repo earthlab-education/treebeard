@@ -12,8 +12,10 @@ Treebeard is a project for identifying canopy gaps/tree gaps for foresters, deve
 - [Results](#results)
 - [How to Run Jupyter Notebooks](#how-to-run-jupyter-notebooks)
 - [How to Run the QGIS Plug-in](#how-to-run-the-qgis-plug-in)
-- [Setup Instructions](#setup-instructions)
 - [Appendix](#appendix)
+    - [Setup Instructions](#setup-instructions)
+        - [Set up Environment (First Time)](#set-up-environment-first-time)
+        - [Update Environment](#update-environment)
     - [Image Segmentation Method](#image-segmentation-method)
 
 
@@ -45,16 +47,18 @@ The results from image segmentation and LIDAR processing yield similar outcomes 
 ![Compare Results](images/compare_results.png)
 
 ## How to Run Jupyter Notebooks
-1. Set up the environment (see instructions below)
+1. [Set up the environment](#set-up-environment-first-time) / [Update Environment](#update-environment)
 2. Run `treebeard_image_segmentation.ipynb`
 3. Run `treebeard_lidar.ipynb`
 
 ## How to Run the QGIS Plug-in
 Please refer to the README file at [`qgis_build/treebeard/README.md`](https://github.com/earthlab-education/treebeard/blob/main/qgis_build/treebeard/README.md).
 
-## Setup Instructions
+## Appendix
 
-### Set up Environment (First Time)
+### Setup Instructions
+
+#### Set up Environment (First Time)
 ```
 conda activate base
 conda install -c conda-forge mamba
@@ -62,13 +66,11 @@ mamba env create -f environment.yml
 conda activate treebeard
 ```
 
-### Update Environment
+#### Update Environment
 ```
 conda activate treebeard
 mamba env update -f environment.yml
 ```
-
-## Appendix
 
 ### Image Segmentation Method
 
