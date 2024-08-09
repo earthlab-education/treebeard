@@ -4,6 +4,19 @@
 
 Treebeard is a project for identifying canopy gaps/tree gaps for foresters, developed during Earth Data Analytics Professional Graduate Certificate Program at CU Boulder by these students: Ed Chan, Chris Griego, and Peter Kobylarz.
 
+## Quick Links
+- [Project Background](#project-background)
+- [Objectives](#objectives)
+- [Data Source](#data-source)
+- [Project Workflow](#project-workflow)
+- [Results](#results)
+- [How to Run Jupyter Notebooks](#how-to-run-jupyter-notebooks)
+- [How to Run the QGIS Plug-in](#how-to-run-the-qgis-plug-in)
+- [Setup Instructions](#setup-instructions)
+- [Appendix](#appendix)
+    - [Image Segmentation Method](#image-segmentation-method)
+
+
 ## Project Background
 The Watershed Center is interested in identifying canopy gaps and binning them by size (1/8 acre, 1/4 acre, 1/2 acre, and 1+ acre). To quote the forester Eric Frederick:
 > Forest structural diversity is a key component of forest ecosystem health, as forests that contain structural heterogeneity are critical for providing wildlife habitat and can be more resilient to natural disturbances. Being able to quantify forest structural heterogeneity is important to be able to assess the need for potential management actions, and it allows us to ensure that our forest management projects are creating structural heterogeneity rather than homogeneity. This tool will allow us to better determine the need for canopy gaps in project areas, and it will allow us to more accurately pinpoint beneficial locations for creating canopy gaps of various sizes when implementing projects.
@@ -54,3 +67,13 @@ conda activate treebeard
 conda activate treebeard
 mamba env update -f environment.yml
 ```
+
+## Appendix
+
+### Image Segmentation Method
+
+Here are the illustrations of the method:
+
+![Image Segmentation 01](images/image_segmentation_01.png)
+![Image Segmentation 02](images/image_segmentation_02.png)
+![Image Segmentation 03](images/image_segmentation_03.png)
