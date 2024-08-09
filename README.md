@@ -99,7 +99,7 @@ mamba env update -f environment.yml
 
 ### Image Segmentation Method
 
-Here are the illustrations of the image segmentation:
+Here are illustrations of image segmentation:
 
 ![Image Segmentation 01](images/image_segmentation_01.png)
 ![Image Segmentation 02](images/image_segmentation_02.png)
