@@ -16,8 +16,10 @@ The Watershed Center is interested in identifying canopy gaps and binning them b
 ## Data Source
 - Shape files from the Watershed Center
     - It's already part of the repo at `assets/` which you get from cloning this repository
-- [Aerial Data: "Denver Regional Aerial Photography Project (DRAPP)", Denver Regional Counsel of Governance, 2020.](https://data.drcog.org/dataset/denver-regional-aerial-photography-project-tiles-2020)
+- [Aerial Data: "Denver Regional Aerial Photography Project (DRAPP)", Denver Regional Counsel of Governance, 2020.](https://data.drcog.org/dataset/denver-regional-aerial-photography-project-tiles-2020) 
 - [LIDAR Data: "DRCOG LIDAR QL2 INDEX IN CO SP NORTH 2020", Denver Regional Counsel of Governance.](https://data.drcog.org/dataset/lidar-ql2-index-in-co-sp-north-2020)
+
+Note: Beware the notebooks will download these aerial imagery tiles and LIDAR tiles for you. Please review the download destinations accordingly for your needs.
 
 ## Project Workflow
 
