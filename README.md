@@ -2,7 +2,7 @@
 
 [![DOI](https://zenodo.org/badge/783989380.svg)](https://zenodo.org/doi/10.5281/zenodo.11107001)
 
-Treebeard is a project for identifying canopy gaps/tree gaps for foresters, developed during Earth Data Analytics Professional Graduate Certificate Program at CU Boulder by these students: Ed Chan, Chris Griego, and Peter Kobylarz.
+Treebeard is a project for **identifying canopy gaps/tree gaps for foresters**, developed during Earth Data Analytics Professional Graduate Certificate Program at CU Boulder by these students: Ed Chan, Chris Griego, and Peter Kobylarz.
 
 ## Quick Links
 - [Project Background](#project-background)
@@ -13,6 +13,7 @@ Treebeard is a project for identifying canopy gaps/tree gaps for foresters, deve
 - [How to Run Jupyter Notebooks](#how-to-run-jupyter-notebooks)
 - [How to Run the QGIS Plug-in](#how-to-run-the-qgis-plug-in)
 - [Appendix](#appendix)
+    - [Pre-requisites](#pre-requisites)
     - [Setup Instructions](#setup-instructions)
         - [Set up Environment (First Time)](#set-up-environment-first-time)
         - [Update Environment](#update-environment)
@@ -47,7 +48,7 @@ The results from image segmentation and LIDAR processing yield similar outcomes 
 ![Compare Results](images/compare_results.png)
 
 ## How to Run Jupyter Notebooks
-1. [Set up the environment](#set-up-environment-first-time) / [Update Environment](#update-environment)
+1. [Set up the environment](#set-up-environment-first-time) / [Update environment](#update-environment)
 2. Run `treebeard_image_segmentation.ipynb`
 3. Run `treebeard_lidar.ipynb`
 
@@ -55,6 +56,9 @@ The results from image segmentation and LIDAR processing yield similar outcomes 
 Please refer to the README file at [`qgis_build/treebeard/README.md`](https://github.com/earthlab-education/treebeard/blob/main/qgis_build/treebeard/README.md).
 
 ## Appendix
+
+### Pre-requisites
+- Install [Conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html)
 
 ### Setup Instructions
 
