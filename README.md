@@ -40,7 +40,10 @@ The Watershed Center is interested in identifying canopy gaps and binning them b
 Note: Beware the notebooks will download these aerial imagery tiles and LIDAR tiles for you. Please review the download destinations accordingly for your needs.
 
 ## Output Folder Location
-This workflow uses the EarthyPy libary. This library has a default data directory, and the sub directories set up used in the code have the EarthPy directory as parent. You can change your parent directory by adjusting the "data_dir" path variable near the beginning of the notebooks. 
+This workflow uses the EarthyPy libary. This library has a default data directory, and the sub directories set up used in the code have the EarthPy directory as parent. You can change your parent directory by adjusting the "data_dir" path variable near the beginning of the notebooks. The default folder path is:
+```plaintext
+C:\Users\[username]\earth-analytics\data
+```
 
 ## Project Workflow
 
