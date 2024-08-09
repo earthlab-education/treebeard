@@ -30,10 +30,12 @@ The Watershed Center is interested in identifying canopy gaps and binning them b
 3. Develop QGIS plug-in
 
 ## Data Source
-- Shape files from the Watershed Center
+- Shape files representing study areas from the Watershed Center
     - It's already part of the repo at `assets/` which you get from cloning this repository
+    - You can prepare your own study area shapefiles. Make sure to include the column called 'Proj_ID' that contains values of study area names.
 - [Aerial Data: "Denver Regional Aerial Photography Project (DRAPP)", Denver Regional Counsel of Governance, 2020.](https://data.drcog.org/dataset/denver-regional-aerial-photography-project-tiles-2020) 
 - [LIDAR Data: "DRCOG LIDAR QL2 INDEX IN CO SP NORTH 2020", Denver Regional Counsel of Governance.](https://data.drcog.org/dataset/lidar-ql2-index-in-co-sp-north-2020)
+    - This tool should work with other imagery and LIDAR data sources. You will need to adjust the code to point to the download URLs for index layers and tile downloads.
 
 Note: Beware the notebooks will download these aerial imagery tiles and LIDAR tiles for you. Please review the download destinations accordingly for your needs.
 
