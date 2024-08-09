@@ -83,6 +83,13 @@ def generate_binary_gdf_ndvi(tilepath, n_clusters=2, plot_segments=False, plot_p
     # Compute mean NDVI for each segment
     mean_ndvi_vals = []
     for shp in tqdm(polys, desc="Computing mean NDVI values"):
+        """
+            Improvement Ideas:
+            - by indexes instead of coordinates
+            - by segments instead of polys 
+            - zip them later
+            - have both steps dependent on segments
+        """
         mask = rasterio.features.geometry_mask([shp], transform=affine, invert=True, out_shape=ndvi.shape)
         mean_ndvi_vals.append(ndvi[mask].mean())
 
