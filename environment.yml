@@ -14,7 +14,6 @@ dependencies:
   - tqdm
 
   # Data Handling
-  - json  # Standard library, included here for completeness
   - pandas
   - requests
   
@@ -59,10 +58,7 @@ dependencies:
   - rioxarray
   - rioxarray>=0.3.0
   - scipy
-  - scipy.ndimage
   - shapely
-  - shapely.geometry
-  - shapely.ops
   - tweepy
   - whitebox
   - whitebox

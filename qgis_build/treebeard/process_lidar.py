@@ -155,8 +155,8 @@ def process_lidar_to_canopy(proj_area, las_folder_path, canopy_height=5):
         # Process LAS file to TIFF for first and ground returns
         print(las_file)
 
-        las_filename = os.path.splitext(las_file)[0]
-        las_filename = las_filename + ".las"
+        las_filename_no_ext = os.path.splitext(las_file)[0]
+        las_filename = las_filename_no_ext + ".las"
 
         las_file = laspy.read(las_filename)
         crs_wkt = las_file.header.parse_crs().to_wkt()
@@ -168,12 +168,12 @@ def process_lidar_to_canopy(proj_area, las_folder_path, canopy_height=5):
         output_fr_tif = os.path.join(
             las_folder_path,
             "output",
-            las_filename +'_fr.tif'
+            las_filename_no_ext +'_fr.tif'
         )
         output_gr_tif = os.path.join(
             las_folder_path,
             "output",
-            las_filename +'_gr.tif'
+            las_filename_no_ext +'_gr.tif'
         )
 
         first_return = wbt.lidar_idw_interpolation(
