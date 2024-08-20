@@ -1,12 +1,15 @@
 import os
+import logging
+import subprocess
 import sys
+import traceback
 
 import geopandas as gpd
 import numpy as np
-from qgis.PyQt.QtWidgets import QFileDialog, QDialog, QAction, QMessageBox
+from qgis.PyQt.QtWidgets import QApplication, QFileDialog, QDialog, QAction, QMessageBox
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import QgsProject, QgsRasterLayer, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry
-from PyQt5.QtCore import QVariant, QCoreApplication
+from PyQt5.QtCore import Qt, QVariant, QCoreApplication
 import requests
 import rioxarray
 import rasterio
@@ -16,16 +19,31 @@ from shapely.ops import unary_union
 
 import whitebox
 
-import sys
-import os
 
-
-from .treebeard_dialog_base import treebeardDialog
+from .treebeard_dialog import treebeardDialog
 from .import_lidar_dialog import Ui_import_lidar_dialog as ImportLidarDialog
 from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
+from .progress_dialog import Ui_Progress_Dialog as ProgressDialog
 from .process_lidar import  process_canopy_areas, process_lidar_to_canopy
 
-COLO_CRS = "EPSG:6430"
+# COLO_CRS = "EPSG:6430"
+
+# Set up logging
+logger = logging.getLogger('qgis_plugin')
+logger.setLevel(logging.DEBUG)  # Set to the lowest level to capture all logs
+
+# Create console handler and set level to debug
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+
+# Create formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Add formatter to console handler
+console_handler.setFormatter(formatter)
+
+# Add console handler to logger
+logger.addHandler(console_handler)
 
 # def ensure_crs(geodf, target_crs=COLO_CRS):
 #     """Ensure the GeoDataFrame is in the specified CRS."""
@@ -42,9 +60,6 @@ COLO_CRS = "EPSG:6430"
 #         raster = raster.rio.reproject(target_crs)
 #     return raster
 
-def convert_boundary_to_gdf(boundary_path, crs):
-    """Load in boundary file to make sure it is in gdf format before processing """
-
 
 class TreebeardDialog(treebeardDialog):
     def __init__(self, parent=None):
@@ -55,15 +70,15 @@ class TreebeardDialog(treebeardDialog):
         self.processButton.clicked.connect(self.process_kmeans)
         self.browseLidarButton.clicked.connect(self.show_import_lidar_dialog)
         self.processCanopyButton.clicked.connect(self.process_lidar_data)
-        self.defineProjectDir.clicked.connect(self.set_proj_dir)
+        self.browseOutputButton.clicked.connect(self.set_proj_dir)
         self.raster_path = ""
-        self.polygon_path = ""
+        self.proj_area_poly = ""
         self.lidar_path = ""
         self.output_dir = ""
 
     def set_proj_dir(self):
         """Sets folder for output files"""
-        directory = QFileDialog.getExistingDiretory(self, "Select Output Directory")
+        directory = QFileDialog.getExistingDirectory(self, "Select Output Directory")
 
         if directory:
             self.output_dir = directory
@@ -104,13 +119,33 @@ class TreebeardDialog(treebeardDialog):
 
     def handle_lidar_selection(self, ui, dialog):
         selection = ui.importLidarComboBox.currentText()
+        
         if selection == "Import from QGIS Layer":
             self.lidar_path = self.import_from_qgis_layer()
-        # elif selection == "Import from Dataset":
-        #     self.lidar_path = self.download_from_dataset()
+        
         elif selection == "Import from Desktop":
-            self.lidar_path, _ = QFileDialog.getOpenFileName(dialog, "Select LiDAR File", "", "LiDAR files (*.las)")
+            # Prompt user to select a LiDAR file
+            lidar_path = QFileDialog.getExistingDirectory(dialog, "Select LiDAR Directory")
+            
+            # Check if the user selected a file
+            if not lidar_path:
+                QMessageBox.critical(dialog, "Error", "No LiDAR file selected.")
+                return
+
+            # Normalize the file path
+            lidar_path = os.path.normpath(lidar_path)
+            
+            # Ensure the directory and file are valid
+            if not os.path.exists(lidar_path):
+                QMessageBox.critical(dialog, "Error", f"The file does not exist: {lidar_path}")
+                return
+
+            # Store the valid file path
+            self.lidar_path = lidar_path
+        
+        # Close the dialog if a valid file was selected
         dialog.accept()
+
     
     # def download_lidar_files(self, tiles_by_area, lidar_las_dir):
     #     las_root_url = 'https://lidararchive.s3.amazonaws.com/2020_CSPN_Q2/'
@@ -144,16 +179,38 @@ class TreebeardDialog(treebeardDialog):
 
     def browse_polygon_file(self):
         """Browse and select a boundary polygon file."""
-        self.polygon_path, _ = QFileDialog.getOpenFileName(self, "Select Boundary Polygon File", "", "Vector files (*.shp *.geojson)")
-        if self.polygon_path:
-            self.polygonLineEdit.setText(self.polygon_path)
+        # Open file dialog to select the boundary polygon file
+        proj_area_path, _ = QFileDialog.getOpenFileName(self, "Select Boundary Polygon File", "", "Vector files (*.shp *.geojson)")
+        
+        if proj_area_path:
+            # Update the class variable with the selected file path
+            self.proj_area_poly = proj_area_path
+            
+            # Update the UI element with the selected file path
+            self.polygonLineEdit.setText(self.proj_area_poly)
+            
+        
+    def set_proj_area_gdf(self, boundary_path):
+        try:
+            if not boundary_path:
+                raise ValueError("No boundary file set. Please select a boundary file.")
 
-    # def process_files(self):
-    #     """Process the selected files."""
-    #     if not self.raster_path or not self.polygon_path:
-    #         QMessageBox.critical(self, "Error", "Please select both raster and polygon files.")
-    #         return
-    #     # Add processing logic here
+            if not os.path.exists(boundary_path):
+                raise FileNotFoundError(f"The boundary file does not exist: {boundary_path}")
+
+            proj_area_gdf = gpd.read_file(boundary_path)
+            if proj_area_gdf.empty:
+                raise ValueError("The boundary file was loaded but contains no data.")
+
+            if proj_area_gdf.crs is None:
+                raise AttributeError("Boundary file has no crs attribute.")
+
+            logger.debug(f"Boundary file loaded and CRS set to {proj_area_gdf.crs}")
+            return proj_area_gdf
+        except Exception as e:
+            logger.error("Failed to load and set CRS for the boundary file.", exc_info=True)
+            raise
+
 
 
     def load_from_pc(self):
@@ -162,41 +219,84 @@ class TreebeardDialog(treebeardDialog):
             self.lidarLineEdit.setText(self.lidar_path)
 
     def process_lidar_data(self):
-        lidar_file = self.lidarLineEdit.text()
+        logger.info("Clicked on 'Process Canopy' button. Starting process_lidar_data...")
+
+        lidar_file = self.lidar_path
         if not lidar_file:
+            logger.error("No LiDAR file selected.")
             QMessageBox.critical(self, "Error", "Please select a LiDAR file.")
             return
+
+        study_area = self.set_proj_area_gdf(self.proj_area_poly)
+        if study_area is None:
+            logger.error("Failed to load the project area GeoDataFrame.")
+            QMessageBox.critical(self, "Error", "Failed to load the project area.")
+            return
+
+            # Ensure sys.stdout is not None
+        if sys.stdout is None:
+            sys.stdout = open(os.devnull, 'w')
+       
+        process = None
+
+        # Initialize Progress Dialog
+        progress_dialog = QDialog()
+        ui = ProgressDialog()
+        ui.setupUi(progress_dialog)
+
+        # Set initial progress value and clear output text
+        ui.progressBar.setValue(0)
+        ui.statusTextEdit.clear()
+        progress_dialog.show()
+
         try:
-            # code from for_chris 
-            canopy_gdf = process_lidar_to_canopy(proj_area, las_folder_path, canopy_height=5)
+            # Start the process and update progress
+            ui.statusTextEdit.append("Initializing WhiteboxTools...")
+            QApplication.processEvents()
 
-            # Specify the output path from QGIS parameter? Or default to the earth analytics folder
-            output_path = os.path.join(lidar_las_dir, "output")
+            wbt = whitebox.WhiteboxTools()
 
+            ui.statusTextEdit.append("Running LiDAR IDW Interpolation...")
+            ui.progressBar.setValue(20)  # Update progress
+            QApplication.processEvents()
+            
+            # Here we assume the process is successfully started
+            if process:
+                process.wait()  # Wait for the process to complete
+                logger.info("WhiteboxTools process completed successfully.")
+            
+            # Continue with canopy processing
+            canopy_gdf = process_lidar_to_canopy(study_area, lidar_file, canopy_height=5)
+            
+            output_path = os.path.join(self.output_dir, "lidar_canopy_output")
             if not os.path.exists(output_path):
                 os.makedirs(output_path)
 
-            process_canopy_areas(canopy_gdf, proj_area, output_path, buffer_distance=5)
-
-
-            # output_tif = os.path.join(os.path.dirname(lidar_file), 'processed_lidar.tif')
-            # convert_las_to_tif(lidar_file, output_tif, 'first')
-            # lidar_cleaned = clean_raster_rioxarray(rioxarray.open_rasterio(output_tif))
-            # canopy_gdf = export_lidar_canopy_tif(lidar_cleaned, output_tif)
- 
-            #  # Ensure CRS for both raster and vector data
-            # canopy_gdf = ensure_crs(canopy_gdf)
-            # study_area = gpd.read_file(self.polygonLineEdit.text())
-            # study_area = ensure_crs(study_area)
-
-            # # Further processing
-            # clipped_buffer, exploded_gap_gdf = process_canopy_areas(canopy_gdf, study_area)
-
-            # # Load raster to QGIS
-            # self.load_raster_to_qgis(output_tif, 'Processed LiDAR Canopy')
+            process_canopy_areas(canopy_gdf, 
+                                 lambda: os.path.basename(self.output_dir)(),
+                                study_area, 
+                                output_path,
+                                buffer_distance=5)
+            # self.load_raster_to_qgis(output_path, 'Processed LiDAR Canopy')
             QMessageBox.information(self, "Success", "LiDAR processing complete.")
+
         except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+            logger.error("An error occurred during LiDAR processing.", exc_info=True)
+            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
+
+        finally:
+            if process:
+                try:
+                    if process.poll() is None:  # Check if the process is still running
+                        logger.warning("Process still running. Terminating...")
+                        process.terminate()
+                    if process.stdout:
+                        process.stdout.close()
+                    if process.stderr:
+                        process.stderr.close()
+                except Exception as e:
+                    logger.error("An error occurred while managing the process.", exc_info=True)
+
 
     def load_raster_to_qgis(self, raster_path, layer_name):
         raster_layer = QgsRasterLayer(raster_path, layer_name)
@@ -232,11 +332,7 @@ class TreebeardDialog(treebeardDialog):
         QgsProject.instance().addMapLayer(raster_layer)
         QMessageBox.information(self, "Success", f"Raster layer '{layer_name}' loaded successfully.")
 
-
-    def browse_polygon_file(self):
-        self.polygon_path, _ = QFileDialog.getOpenFileName(self, "Select Boundary Polygon File", "", "Vector files (*.shp *.geojson)")
-        if self.polygon_path:
-            self.polygonLineEdit.setText(self.polygon_path)
+      
 
     def load_polygons_to_qgis(self, gdf, layer_name='Clustered Polygons'):
         vl = QgsVectorLayer("Polygon?crs=EPSG:4326", layer_name, "memory")

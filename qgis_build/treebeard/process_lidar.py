@@ -15,7 +15,7 @@ from shapely.ops import unary_union
 import whitebox
 
 # Method to process canopy gaps.
-def process_canopy_areas(canopy_gdf, study_area, output_path, buffer_distance=5):
+def process_canopy_areas(canopy_gdf, proj_area_name, study_area, output_path, buffer_distance=5):
     """
     Processes canopy areas by buffering, dissolving, clipping, and exploding the geometries.
     Adds acreage and size category columns.
@@ -89,7 +89,7 @@ def process_canopy_areas(canopy_gdf, study_area, output_path, buffer_distance=5)
     exploded_gap_gdf['Gap_Size_Category'] = exploded_gap_gdf['Acreage'].apply(categorize_gap_size)
 
     # Output shapefiles
-    proj_area_name = str(study_area['Proj_ID'].iloc[0])
+
     canopy_gaps_calced_path = os.path.join(output_path,'lidar_'+ proj_area_name + '_canopy_gaps_calced.shp')
     exploded_gap_gdf.to_file(canopy_gaps_calced_path)
     dissolved_canopy_gdf = os.path.join(output_path, 'lidar_'+ proj_area_name + '_canopy.shp')
