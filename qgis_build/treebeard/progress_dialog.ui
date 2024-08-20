@@ -32,7 +32,7 @@
     <bool>false</bool>
    </property>
   </widget>
-  <widget class="QLabel" name="progress_sate">
+  <widget class="QLabel" name="progress_state">
    <property name="geometry">
     <rect>
      <x>200</x>

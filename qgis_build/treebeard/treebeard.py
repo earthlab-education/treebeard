@@ -6,7 +6,7 @@ import traceback
 
 import geopandas as gpd
 import numpy as np
-from qgis.PyQt.QtWidgets import QApplication, QFileDialog, QDialog, QAction, QMessageBox
+from qgis.PyQt.QtWidgets import QApplication, QFileDialog, QDialog, QAction, QMessageBox, QInputDialog
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import QgsProject, QgsRasterLayer, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry
 from PyQt5.QtCore import Qt, QVariant, QCoreApplication
@@ -23,7 +23,7 @@ import whitebox
 from .treebeard_dialog import treebeardDialog
 from .import_lidar_dialog import Ui_import_lidar_dialog as ImportLidarDialog
 from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
-from .progress_dialog import Ui_Progress_Dialog as ProgressDialog
+from .progress_dialog import Ui_Dialog as ProgressDialog
 from .process_lidar import  process_canopy_areas, process_lidar_to_canopy
 
 # COLO_CRS = "EPSG:6430"
@@ -233,7 +233,7 @@ class TreebeardDialog(treebeardDialog):
             QMessageBox.critical(self, "Error", "Failed to load the project area.")
             return
 
-            # Ensure sys.stdout is not None
+        # Ensure sys.stdout is not None
         if sys.stdout is None:
             sys.stdout = open(os.devnull, 'w')
        
@@ -246,17 +246,17 @@ class TreebeardDialog(treebeardDialog):
 
         # Set initial progress value and clear output text
         ui.progressBar.setValue(0)
-        ui.statusTextEdit.clear()
+        ui.progress_state.clear()
         progress_dialog.show()
 
         try:
             # Start the process and update progress
-            ui.statusTextEdit.append("Initializing WhiteboxTools...")
+            ui.progress_state.append("Initializing WhiteboxTools...")
             QApplication.processEvents()
 
             wbt = whitebox.WhiteboxTools()
 
-            ui.statusTextEdit.append("Running LiDAR IDW Interpolation...")
+            ui.progress_state.append("Running LiDAR IDW Interpolation...")
             ui.progressBar.setValue(20)  # Update progress
             QApplication.processEvents()
             
@@ -265,24 +265,54 @@ class TreebeardDialog(treebeardDialog):
                 process.wait()  # Wait for the process to complete
                 logger.info("WhiteboxTools process completed successfully.")
             
-            # Continue with canopy processing
+            # Update progress to show canopy creations
+            ui.progress_state.setTesxt("Creating first and second return geodataframes.")
+            ui.progressBar.setValue(35)
+            QApplication.processEvents()
+
             canopy_gdf = process_lidar_to_canopy(study_area, lidar_file, canopy_height=5)
             
             output_path = os.path.join(self.output_dir, "lidar_canopy_output")
             if not os.path.exists(output_path):
                 os.makedirs(output_path)
 
+            # Update progress and continue with canopy processing
+            ui.progress_state.setText("Processing canopy areas...")
+            ui.progressBar.setValue(50)
+            QApplication.processEvents()
+
             process_canopy_areas(canopy_gdf, 
-                                 lambda: os.path.basename(self.output_dir)(),
+                                os.path.basename(self.output_dir),  # Corrected lambda usage
                                 study_area, 
                                 output_path,
                                 buffer_distance=5)
-            # self.load_raster_to_qgis(output_path, 'Processed LiDAR Canopy')
+            
+            # Update progress and prompt user to load shapefiles
+            ui.progress_state.setText("Finalizing and preparing output...")
+            ui.progressBar.setValue(80)
+            QApplication.processEvents()
+
+            # Show a dialog to let the user choose which shapefiles to load
+            shapefiles = [os.path.join(output_path, f) for f in os.listdir(output_path) if f.endswith('.shp')]
+            selected_shapefiles = self.prompt_load_shapefiles(shapefiles)
+
+            if selected_shapefiles:
+                for shapefile in selected_shapefiles:
+                    self.load_polygon_to_qgis(shapefile, os.path.basename(shapefile))
+                ui.progress_state.setText("Shapefiles loaded into QGIS.")
+            else:
+                ui.progress_state.setText("No shapefiles were loaded.")
+
+            ui.progressBar.setValue(100)  # Update progress to completion
+            progress_dialog.accept()
+
+            # User feedback on successful processing
             QMessageBox.information(self, "Success", "LiDAR processing complete.")
 
         except Exception as e:
             logger.error("An error occurred during LiDAR processing.", exc_info=True)
             QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
+            progress_dialog.reject()
 
         finally:
             if process:
@@ -297,6 +327,33 @@ class TreebeardDialog(treebeardDialog):
                 except Exception as e:
                     logger.error("An error occurred while managing the process.", exc_info=True)
 
+
+    def prompt_load_shapefiles(self, shapefiles):
+        """
+        Prompt the user to select which shapefiles to load into QGIS.
+        :param shapefiles: List of shapefile paths.
+        :return: List of selected shapefiles.
+        """
+        items, ok = QInputDialog.getItem(self, "Select Shapefiles", 
+                                        "Choose shapefiles to load (Ctrl+click to select multiple):", 
+                                        shapefiles, 0, True)
+
+        if ok and items:
+            return items
+        return []
+
+    def load_polygon_to_qgis(self, shapefile_path, layer_name):
+        """
+        Load a polygon shapefile into QGIS.
+        :param shapefile_path: Path to the shapefile.
+        :param layer_name: Name for the QGIS layer.
+        """
+        layer = QgsVectorLayer(shapefile_path, layer_name, "ogr")
+        if not layer.isValid():
+            QMessageBox.critical(self, "Error", f"Failed to load shapefile: {shapefile_path}")
+            return
+        QgsProject.instance().addMapLayer(layer)
+        logger.info(f"Loaded shapefile into QGIS: {shapefile_path}")
 
     def load_raster_to_qgis(self, raster_path, layer_name):
         raster_layer = QgsRasterLayer(raster_path, layer_name)

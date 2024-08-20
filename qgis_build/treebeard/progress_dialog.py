@@ -11,7 +11,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 
-class Ui_Progress_Dialog(object):
+class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
         Dialog.resize(495, 151)
@@ -21,9 +21,9 @@ class Ui_Progress_Dialog(object):
         self.progressBar.setOrientation(QtCore.Qt.Horizontal)
         self.progressBar.setInvertedAppearance(False)
         self.progressBar.setObjectName("progressBar")
-        self.progress_sate = QtWidgets.QLabel(Dialog)
-        self.progress_sate.setGeometry(QtCore.QRect(200, 90, 171, 41))
-        self.progress_sate.setObjectName("progress_sate")
+        self.progress_state = QtWidgets.QLabel(Dialog)
+        self.progress_state.setGeometry(QtCore.QRect(200, 90, 171, 41))
+        self.progress_state.setObjectName("progress_state")
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
@@ -31,4 +31,4 @@ class Ui_Progress_Dialog(object):
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
-        self.progress_sate.setText(_translate("Dialog", "TextLabel"))
+        self.progress_state.setText(_translate("Dialog", "TextLabel"))
