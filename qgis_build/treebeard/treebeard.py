@@ -8,6 +8,7 @@ import geopandas as gpd
 import numpy as np
 from qgis.PyQt.QtWidgets import QApplication, QFileDialog, QDialog, QAction, QMessageBox, QInputDialog
 from qgis.PyQt.QtGui import QIcon
+from PyQt5.QtWidgets import QDialog, QListWidgetItem, QMessageBox
 from qgis.core import QgsProject, QgsRasterLayer, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry
 from PyQt5.QtCore import Qt, QVariant, QCoreApplication
 import requests
@@ -25,6 +26,7 @@ from .import_lidar_dialog import Ui_import_lidar_dialog as ImportLidarDialog
 from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
 from .progress_dialog import Ui_Dialog as ProgressDialog
 from .process_lidar import  process_canopy_areas, process_lidar_to_canopy
+from .shp_select import Ui_shpFileSelect 
 
 # COLO_CRS = "EPSG:6430"
 
@@ -44,21 +46,6 @@ console_handler.setFormatter(formatter)
 
 # Add console handler to logger
 logger.addHandler(console_handler)
-
-# def ensure_crs(geodf, target_crs=COLO_CRS):
-#     """Ensure the GeoDataFrame is in the specified CRS."""
-#     if geodf.crs =  None:
-#         geodf = geodf.rio.write_crs(target_crs)
-
-#     elif geodf.crs != target_crs:
-#         geodf = geodf.to_crs(target_crs)
-#     return geodf
-
-# def ensure_raster_crs(raster, target_crs=COLO_CRS):
-#     """Ensure the raster is in the specified CRS."""
-#     if raster.rio.crs != target_crs:
-#         raster = raster.rio.reproject(target_crs)
-#     return raster
 
 
 class TreebeardDialog(treebeardDialog):
@@ -146,36 +133,6 @@ class TreebeardDialog(treebeardDialog):
         # Close the dialog if a valid file was selected
         dialog.accept()
 
-    
-    # def download_lidar_files(self, tiles_by_area, lidar_las_dir):
-    #     las_root_url = 'https://lidararchive.s3.amazonaws.com/2020_CSPN_Q2/'
-    #     canopy_dict = {}
-        
-    #     if not self.boundary_polygon_path:
-    #         QMessageBox.critical(None, "Error", "Please import a boundary polygon first.")
-    #         return
-
-    #     proj_area_gdf = gpd.read_file(self.boundary_polygon_path)
-    #     site_to_process = tiles_by_area[tiles_by_area['Proj_ID'] == 'Zumwinkel'].copy()
-    #     for index, row in site_to_process.iterrows():
-    #         tiles = row['tile']
-    #         proj_area_name = row['Proj_ID']
-    #         sel_proj_area_gdf = proj_area_gdf[proj_area_gdf['Proj_ID'] == proj_area_name]
-    #         tile_agg = []
-    #         print("Processing LIDAR for " + proj_area_name)
-    #         for tile in tiles:
-    #             file_name = tile + ".las"
-    #             print("Processing LIDAR tile " + tile)
-    #             tile_path = os.path.join(lidar_las_dir, file_name)
-    #             download_url = las_root_url + tile + ".las"
-    #             if not os.path.exists(tile_path):
-    #                 response = requests.get(download_url)
-    #                 if response.status_code == 200:
-    #                     with open(tile_path, 'wb') as file:
-    #                         file.write(response.content)
-    #                     print(f"File downloaded successfully and saved to {tile_path}")
-    #                 else:
-    #                     print(f"Failed to download file. Status code: {response.status_code}")
 
     def browse_polygon_file(self):
         """Browse and select a boundary polygon file."""
@@ -251,12 +208,12 @@ class TreebeardDialog(treebeardDialog):
 
         try:
             # Start the process and update progress
-            ui.progress_state.append("Initializing WhiteboxTools...")
+            ui.progress_state.setText("Initializing WhiteboxTools...")
             QApplication.processEvents()
 
             wbt = whitebox.WhiteboxTools()
 
-            ui.progress_state.append("Running LiDAR IDW Interpolation...")
+            ui.progress_state.setText("Running LiDAR IDW Interpolation...")
             ui.progressBar.setValue(20)  # Update progress
             QApplication.processEvents()
             
@@ -266,7 +223,7 @@ class TreebeardDialog(treebeardDialog):
                 logger.info("WhiteboxTools process completed successfully.")
             
             # Update progress to show canopy creations
-            ui.progress_state.setTesxt("Creating first and second return geodataframes.")
+            ui.progress_state.setText("Creating first and second return geodataframes.")
             ui.progressBar.setValue(35)
             QApplication.processEvents()
 
@@ -294,14 +251,9 @@ class TreebeardDialog(treebeardDialog):
 
             # Show a dialog to let the user choose which shapefiles to load
             shapefiles = [os.path.join(output_path, f) for f in os.listdir(output_path) if f.endswith('.shp')]
-            selected_shapefiles = self.prompt_load_shapefiles(shapefiles)
+            selected_shapefiles = self.show_shp_files(shapefiles)
 
-            if selected_shapefiles:
-                for shapefile in selected_shapefiles:
-                    self.load_polygon_to_qgis(shapefile, os.path.basename(shapefile))
-                ui.progress_state.setText("Shapefiles loaded into QGIS.")
-            else:
-                ui.progress_state.setText("No shapefiles were loaded.")
+ 
 
             ui.progressBar.setValue(100)  # Update progress to completion
             progress_dialog.accept()
@@ -328,19 +280,36 @@ class TreebeardDialog(treebeardDialog):
                     logger.error("An error occurred while managing the process.", exc_info=True)
 
 
-    def prompt_load_shapefiles(self, shapefiles):
-        """
-        Prompt the user to select which shapefiles to load into QGIS.
-        :param shapefiles: List of shapefile paths.
-        :return: List of selected shapefiles.
-        """
-        items, ok = QInputDialog.getItem(self, "Select Shapefiles", 
-                                        "Choose shapefiles to load (Ctrl+click to select multiple):", 
-                                        shapefiles, 0, True)
 
-        if ok and items:
-            return items
-        return []
+    def show_shp_files(self, shapefiles):
+        """Show a dialog for the user to select which shapefiles to load into QGIS."""
+        dialog = QDialog()
+        ui = Ui_shpFileSelect()
+        ui.setupUi(dialog)
+
+        # Add shapefiles to the QListWidget
+        for shapefile in shapefiles:
+            item = QListWidgetItem(os.path.basename(shapefile))
+            item.setData(QtCore.Qt.UserRole, shapefile)
+            item.setCheckState(QtCore.Qt.Unchecked)
+            ui.shapefileListWidget.addItem(item)
+
+        # Show dialog and handle user selection
+        if dialog.exec_() == QDialog.Accepted:
+            selected_files = [ui.shapefileListWidget.item(i).data(QtCore.Qt.UserRole) 
+                            for i in range(ui.shapefileListWidget.count()) 
+                            if ui.shapefileListWidget.item(i).checkState() == QtCore.Qt.Checked]
+            self.load_selected_shapefiles(selected_files)
+
+    def load_shp_file(self, shapefiles):
+        """Load the selected shapefiles into QGIS."""
+        for shapefile in shapefiles:
+            layer = QgsVectorLayer(shapefile, os.path.basename(shapefile), "ogr")
+            if not layer.isValid():
+                QMessageBox.critical(self, "Error", f"Failed to load shapefile: {shapefile}")
+            QgsProject.instance().addMapLayer(layer)
+            logger.info(f"Shapefile loaded: {shapefile}")
+
 
     def load_polygon_to_qgis(self, shapefile_path, layer_name):
         """
