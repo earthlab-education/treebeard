@@ -15,7 +15,12 @@ import os
 
 class KMeansProcessor():
     
-    def generate_binary_gdf_ndvi(self, tilepath, n_clusters=2, plot_segments=False, plot_path=None, output_shapefile_path=None, apply_buffering=False, buffer_size=5):
+    def generate_binary_gdf_ndvi(self, tilepath,
+                                  n_clusters=2, 
+                                  plot_segments=False, 
+                                  plot_path=None, 
+                                  output_shapefile_path=None, 
+                                  apply_buffering=False, buffer_size=5):
         """Generates a segmented K-Means polygon and optionally applies buffering."""
 
         # Load the image and bands
@@ -34,7 +39,12 @@ class KMeansProcessor():
         # Segment the NDVI image using quickshift
         img = io.imread(tilepath)
         img_ndvi = np.expand_dims(ndvi, axis=2).astype(np.float32)
-        segments = quickshift(img_ndvi, kernel_size=3, convert2lab=False, max_dist=6, ratio=0.5).astype('int32')
+        segments = quickshift(img_ndvi, 
+                              kernel_size=3, 
+                              convert2lab=False, 
+                              max_dist=6, 
+                              ratio=0.5).astype('int32')
+        
         print("Quickshift number of segments: %d" % len(np.unique(segments)))
 
         if plot_segments and plot_path:
@@ -42,10 +52,16 @@ class KMeansProcessor():
             self.plot_segments(img, ndvi, segments, plot_path)
 
         # Convert segments to vector features
-        polys = [shape(shp) for shp, value in tqdm(shapes(segments, transform=affine), desc="Converting segments to vector features")]
+        polys = [shape(shp) for shp, value in tqdm(shapes(segments, transform=affine), 
+                                                   desc="Converting segments to vector features")]
 
         # Compute mean NDVI for each segment
-        mean_ndvi_vals = np.array([ndvi[rasterio.features.geometry_mask([shp], transform=affine, invert=True, out_shape=ndvi.shape)].mean() for shp in polys]).reshape(-1, 1)
+        mean_ndvi_vals = np.array([ndvi[rasterio.features.geometry_mask([shp], 
+                                                                        transform=affine, 
+                                                                        invert=True, 
+                                                                        out_shape=ndvi.shape)]
+                                                                        .mean() 
+                                                                        for shp in polys]).reshape(-1, 1)
 
         # Apply K-Means clustering
         kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(mean_ndvi_vals)

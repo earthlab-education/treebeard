@@ -26,6 +26,7 @@ from .import_lidar_dialog import Ui_import_lidar_dialog as ImportLidarDialog
 from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
 from .progress_dialog import Ui_Dialog as ProgressDialog
 from .process_lidar import  process_canopy_areas, process_lidar_to_canopy
+from .segment_drapp_v2 import KMeansProcessor 
 from .shp_select import Ui_shpFileSelect 
 
 # COLO_CRS = "EPSG:6430"
@@ -374,9 +375,49 @@ class TreebeardDialog(treebeardDialog):
         print(f"Layer '{layer_name}' added to QGIS.")
     
     def process_kmeans(self, boundary_gdf, aoi_raster):
-        """Run kmeans processing from segment_drapp"""
+        """Run K-means processing on aerial photography or GeoTIFF raster file."""
+        
+        tilepath = self.raster_path
+        if tilepath is None:
+            logger.error("No Aerial Photography file selected.")
+            QMessageBox.critical(self, "Error", "Please select aerial photograph or GeoTIFF raster file.")
+            return
 
-    pass    
+        # Initialize Progress Dialog
+        progress_dialog = QDialog()
+        ui = ProgressDialog()
+        ui.setupUi(progress_dialog)
+
+        # Set initial progress value and clear output text
+        ui.progressBar.setValue(0)
+        ui.progress_state.setText("Initializing K-means processing...")
+        progress_dialog.show()
+
+        try:
+            processor = KMeansProcessor()
+            
+            # Update progress and call the generate_binary_gdf_ndvi function
+            ui.progress_state.setText("Generating NDVI-based binary GeoDataFrame...")
+            QApplication.processEvents()
+            dissolved_gdf = processor.generate_binary_gdf_ndvi(tilepath, 
+                                                               n_clusters=2, 
+                                                               plot_segments=False)
+            ui.progressBar.setValue(70)
+
+            # Save the output shapefile
+            output_shapefile = os.path.join(self.output_dir, "kmeans_output.shp")
+            dissolved_gdf.to_file(output_shapefile)
+            ui.progress_state.setText(f"K-means processing completed. Output saved to {output_shapefile}")
+            ui.progressBar.setValue(100)
+            QApplication.processEvents()
+
+        except Exception as e:
+            logger.error("An error occurred during K-means processing.", exc_info=True)
+            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
+
+        finally:
+            progress_dialog.accept()
+
     
     def calculate_spatial_statistics(self, gdf):
         stats = gdf['geometry'].area.describe()
