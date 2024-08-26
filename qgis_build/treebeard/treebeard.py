@@ -26,7 +26,7 @@ from .import_lidar_dialog import Ui_import_lidar_dialog as ImportLidarDialog
 from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
 from .progress_dialog import Ui_Dialog as ProgressDialog
 from .process_lidar import  process_canopy_areas, process_lidar_to_canopy
-from .segment_drapp_v2 import KMeansProcessor 
+from .segment_drapp import KMeansProcessor 
 from .shp_select import Ui_shpFileSelect 
 
 # COLO_CRS = "EPSG:6430"
