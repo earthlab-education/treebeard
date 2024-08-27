@@ -10,6 +10,7 @@ from qgis.PyQt.QtWidgets import QApplication, QFileDialog, QDialog, QAction, QMe
 from qgis.PyQt.QtGui import QIcon
 from PyQt5.QtWidgets import QDialog, QListWidgetItem, QMessageBox
 from qgis.core import QgsProject, QgsRasterLayer, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry
+from PyQt5 import QtCore, QtGui, QtWidgets 
 from PyQt5.QtCore import Qt, QVariant, QCoreApplication
 import requests
 import rioxarray
@@ -293,14 +294,14 @@ class TreebeardDialog(treebeardDialog):
             item = QListWidgetItem(os.path.basename(shapefile))
             item.setData(QtCore.Qt.UserRole, shapefile)
             item.setCheckState(QtCore.Qt.Unchecked)
-            ui.shapefileListWidget.addItem(item)
+            ui.listWidget.addItem(item)
 
         # Show dialog and handle user selection
         if dialog.exec_() == QDialog.Accepted:
-            selected_files = [ui.shapefileListWidget.item(i).data(QtCore.Qt.UserRole) 
-                            for i in range(ui.shapefileListWidget.count()) 
-                            if ui.shapefileListWidget.item(i).checkState() == QtCore.Qt.Checked]
-            self.load_selected_shapefiles(selected_files)
+            selected_files = [ui.listWidget.item(i).data(QtCore.Qt.UserRole) 
+                            for i in range(ui.listWidget.count()) 
+                            if ui.listWidget.item(i).checkState() == QtCore.Qt.Checked]
+            self.load_shp_file(selected_files)
 
     def load_shp_file(self, shapefiles):
         """Load the selected shapefiles into QGIS."""
@@ -325,11 +326,6 @@ class TreebeardDialog(treebeardDialog):
         QgsProject.instance().addMapLayer(layer)
         logger.info(f"Loaded shapefile into QGIS: {shapefile_path}")
 
-    def load_raster_to_qgis(self, raster_path, layer_name):
-        raster_layer = QgsRasterLayer(raster_path, layer_name)
-        if not raster_layer.isValid():
-            raise IOError(f"Failed to load raster layer: {raster_path}")
-        QgsProject.instance().addMapLayer(raster_layer)
 
     def browse_raster_file(self):
         self.raster_path, _ = QFileDialog.getOpenFileName(self, "Select Raster File", "", "Raster files (*.tif)")
