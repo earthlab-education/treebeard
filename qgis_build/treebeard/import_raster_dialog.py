@@ -24,9 +24,9 @@ class Ui_import_raster_dialog(object):
         self.confirmOK = QtWidgets.QPushButton(import_raster_dialog)
         self.confirmOK.setGeometry(QtCore.QRect(240, 20, 93, 28))
         self.confirmOK.setObjectName("confirmOK")
-        self.confrimCancel = QtWidgets.QPushButton(import_raster_dialog)
-        self.confrimCancel.setGeometry(QtCore.QRect(240, 60, 93, 28))
-        self.confrimCancel.setObjectName("confrimCancel")
+        self.confirmCancel = QtWidgets.QPushButton(import_raster_dialog)
+        self.confirmCancel.setGeometry(QtCore.QRect(240, 60, 93, 28))
+        self.confirmCancel.setObjectName("confirmCancel")
 
         self.retranslateUi(import_raster_dialog)
         QtCore.QMetaObject.connectSlotsByName(import_raster_dialog)
@@ -38,4 +38,4 @@ class Ui_import_raster_dialog(object):
         self.importRasterComboBox.setItemText(1, _translate("import_raster_dialog", "Import from Dataset"))
         self.importRasterComboBox.setItemText(2, _translate("import_raster_dialog", "Import from Desktop"))
         self.confirmOK.setText(_translate("import_raster_dialog", "OK"))
-        self.confrimCancel.setText(_translate("import_raster_dialog", "Cancel"))
+        self.confirmCancel.setText(_translate("import_raster_dialog", "Cancel"))

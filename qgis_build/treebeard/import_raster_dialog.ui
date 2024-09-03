@@ -51,7 +51,7 @@
     <string>OK</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="confrimCancel">
+  <widget class="QPushButton" name="confirmCancel">
    <property name="geometry">
     <rect>
      <x>240</x>

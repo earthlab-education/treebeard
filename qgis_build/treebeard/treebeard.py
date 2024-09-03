@@ -8,10 +8,10 @@ import geopandas as gpd
 import numpy as np
 from qgis.PyQt.QtWidgets import QApplication, QFileDialog, QDialog, QAction, QMessageBox, QInputDialog
 from qgis.PyQt.QtGui import QIcon
-from PyQt5.QtWidgets import QDialog, QListWidgetItem, QMessageBox
+from PyQt5.QtWidgets import QDialog, QDialogButtonBox,  QLabel,  QListWidget, QListWidgetItem, QMessageBox, QVBoxLayout
 from qgis.core import QgsProject, QgsRasterLayer, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry
 from PyQt5 import QtCore, QtGui, QtWidgets 
-from PyQt5.QtCore import Qt, QVariant, QCoreApplication
+from PyQt5.QtCore import Qt,  QVariant, QCoreApplication
 import requests
 import rioxarray
 import rasterio
@@ -28,7 +28,7 @@ from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
 from .progress_dialog import Ui_Dialog as ProgressDialog
 from .process_lidar import  process_canopy_areas, process_lidar_to_canopy
 from .segment_drapp import KMeansProcessor 
-from .shp_select import Ui_shpFileSelect 
+from .shp_select import Ui_Dialog as ShpSelect
 
 # COLO_CRS = "EPSG:6430"
 
@@ -76,7 +76,7 @@ class TreebeardDialog(treebeardDialog):
     
     def show_import_raster_dialog(self):
         dialog = QDialog()
-        ui =  ImportLidarDialog()
+        ui =  ImportRasterDialog()
         ui.setupUi(dialog)
         
         ui.confirmOK.clicked.connect(lambda: self.handle_raster_selection(ui, dialog))
@@ -98,13 +98,52 @@ class TreebeardDialog(treebeardDialog):
 
     def handle_raster_selection(self, ui, dialog):
         selection = ui.importRasterComboBox.currentText()
+        
         if selection == "Import from QGIS Layer":
-            self.raster_path = self.import_from_qgis_layer()
-        # elif selection == "Import from Dataset":
-        #     self.raster_path = self.download_from_dataset()
+            # Create a simple dialog to select a raster layer
+            select_dialog = QDialog(self)
+            select_dialog.setWindowTitle("Select QGIS Raster Layer")
+            
+            layout = QVBoxLayout(select_dialog)
+            label = QLabel("Select a raster layer from the loaded QGIS layers:", select_dialog)
+            layout.addWidget(label)
+
+            # Create a list widget to show available raster layers
+            layer_list_widget = QListWidget(select_dialog)
+            layout.addWidget(layer_list_widget)
+
+            # Populate the list widget with available raster layers
+            layers = QgsProject.instance().mapLayers().values()
+            for layer in layers:
+                if isinstance(layer, QgsRasterLayer):
+                    layer_list_widget.addItem(layer.name())
+
+            # Create OK and Cancel buttons
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, select_dialog)
+            layout.addWidget(button_box)
+
+            # Handle button clicks
+            button_box.accepted.connect(select_dialog.accept)
+            button_box.rejected.connect(select_dialog.reject)
+
+            # Show the dialog and get the result
+            if select_dialog.exec_() == QDialog.Accepted:
+                selected_items = layer_list_widget.selectedItems()
+                if selected_items:
+                    selected_layer_name = selected_items[0].text()
+                    selected_layer = QgsProject.instance().mapLayersByName(selected_layer_name)
+                    if selected_layer:
+                        self.raster_path = selected_layer[0].source()
+                    else:
+                        QMessageBox.critical(self, "Error", "Selected layer not found.")
+                else:
+                    QMessageBox.critical(self, "Error", "No layer selected.")
+        
         elif selection == "Import from Desktop":
             self.raster_path, _ = QFileDialog.getOpenFileName(dialog, "Select Raster File", "", "Raster files (*.tif)")
+        
         dialog.accept()
+
 
     def handle_lidar_selection(self, ui, dialog):
         selection = ui.importLidarComboBox.currentText()
@@ -286,7 +325,7 @@ class TreebeardDialog(treebeardDialog):
     def show_shp_files(self, shapefiles):
         """Show a dialog for the user to select which shapefiles to load into QGIS."""
         dialog = QDialog()
-        ui = Ui_shpFileSelect()
+        ui = ShpSelect()
         ui.setupUi(dialog)
 
         # Add shapefiles to the QListWidget
@@ -370,7 +409,7 @@ class TreebeardDialog(treebeardDialog):
         QgsProject.instance().addMapLayer(vl)
         print(f"Layer '{layer_name}' added to QGIS.")
     
-    def process_kmeans(self, boundary_gdf, aoi_raster):
+    def process_kmeans(self):
         """Run K-means processing on aerial photography or GeoTIFF raster file."""
         
         tilepath = self.raster_path
@@ -432,7 +471,7 @@ class Treebeard:
         return QCoreApplication.translate('Treebeard', message)
 
     def initGui(self):
-        icon_path = ':/plugins/treebeard/icon.png'
+        icon_path = ':/plugins/treebeard/icon-test1.png'
         self.add_action(
             icon_path,
             text=self.tr(u'Treebeard'),

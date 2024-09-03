@@ -76,7 +76,15 @@ class KMeansProcessor():
         gdf['class'] = gdf['cluster'].apply(lambda x: 1 if x == tree_cluster_idx else 0)
 
         # Dissolve polygons by 'class' to merge connected polygons
-        dissolved_gdf = gdf.dissolve(by='class')
+        dissolved_gdfs = []
+        for cls in tqdm(gdf['class'].unique(), desc="Dissolving polygons by class"):
+            class_gdf = gdf[gdf['class'] == cls]
+            dissolved_gdf = class_gdf.dissolve()
+            dissolved_gdf['class'] = cls
+            dissolved_gdfs.append(dissolved_gdf)
+
+        # Combine the dissolved GeoDataFrames
+        dissolved_gdf = gpd.GeoDataFrame(pd.concat(dissolved_gdfs, ignore_index=True), crs=sr)
 
         if apply_buffering:
             # Apply buffering if requested
