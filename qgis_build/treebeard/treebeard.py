@@ -32,6 +32,11 @@ from .shp_select import Ui_Dialog as ShpSelect
 
 # COLO_CRS = "EPSG:6430"
 
+# Ensure OSGeo4W QGIS path loaded first
+import sys
+sys.path.insert(0, r'C:\PROGRA~1\QGIS33~1.10\apps\Python312\Lib\site-packages')
+
+
 # Set up logging
 logger = logging.getLogger('qgis_plugin')
 logger.setLevel(logging.DEBUG)  # Set to the lowest level to capture all logs

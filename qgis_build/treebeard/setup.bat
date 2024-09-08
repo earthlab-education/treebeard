@@ -2,13 +2,13 @@
 setlocal
 
 REM Set the QGIS directory and handle spaces by enclosing in double quotes
-set "QGIS_DIR=C:\Program Files\QGIS 3.36.3"
+set "QGIS_DIR=C:\Program Files\QGIS 3.34.10"
 
-REM Add the QGIS bin directory to the PATH
-set "PATH=%QGIS_DIR%\bin;%PATH%"
+REM Add the QGIS bin and apps directories to the PATH for correct Python and QGIS dependencies
+set "PATH=%QGIS_DIR%\bin;%QGIS_DIR%\apps\Python312\Scripts;%QGIS_DIR%\apps\Python312\bin;%QGIS_DIR%\apps\qgis\bin;%QGIS_DIR%\apps\grass\bin;%PATH%"
 
 REM Define the OSGeo4W setup command with the correct path
-set "OSGeo4W_SETUP=%QGIS_DIR%\OSGeo4W.bat"
+set OSGeo4W_SETUP=%QGIS_DIR%\osgeo4w.bat
 
 REM Ensure the OSGeo4W batch file exists
 if not exist "%OSGeo4W_SETUP%" (
@@ -17,22 +17,17 @@ if not exist "%OSGeo4W_SETUP%" (
     exit /b 1
 )
 
-REM Sync plugin files to the QGIS plugin directory
-set "DEV_DIR=%~dp0"
-set "PLUGIN_DIR=%USERPROFILE%\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\treebeard"
+REM Remove the user site-packages directory from PYTHONPATH
+set "PYTHONNOUSERSITE=1"
 
-echo Development Directory: "%DEV_DIR%"
-echo Plugin Directory: "%PLUGIN_DIR%"
-
-echo Syncing the specified files from the development folder to the QGIS plugin directory...
-robocopy "%DEV_DIR%" "%PLUGIN_DIR%" treebeard.py treebeard_dialog.py __init__.py
-
-REM Install necessary Python packages using the OSGeo4W shell
+REM Install necessary Python packages using OSGeo4W
 echo Installing dependencies using OSGeo4W...
 
-REM Launch the OSGeo4W shell and install packages
-"%OSGeo4W_SETUP%" ^
-    python3 -m pip install rioxarray rasterio geopandas shapely scipy whitebox scikit-learn fiona pyogrio laspy earthpy tqdm
+call "%OSGeo4W_SETUP%" ^
+python3 -m pip install --upgrade pip ^
+&& python3 -m pip install --force-reinstall rioxarray rasterio geopandas shapely scipy whitebox scikit-learn fiona pyogrio laspy earthpy tqdm
+&& python3 -c "import rioxarray, rasterio, geopandas, shapely; print('Packages installed correctly')"
+
 
 if errorlevel 1 (
     echo "Error occurred during the installation of packages."
