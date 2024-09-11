@@ -476,7 +476,7 @@ class Treebeard:
         return QCoreApplication.translate('Treebeard', message)
 
     def initGui(self):
-        icon_path = ':/plugins/treebeard/icon-test1.png'
+        icon_path = os.path.join(self.plugin_dir, 'icon-test1.png')
         self.add_action(
             icon_path,
             text=self.tr(u'Treebeard'),
