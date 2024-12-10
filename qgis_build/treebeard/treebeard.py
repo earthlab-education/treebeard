@@ -28,12 +28,12 @@ from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
 from .progress_dialog import Ui_Dialog as ProgressDialog
 from .process_lidar import  process_canopy_areas, process_lidar_to_canopy
 from .segment_drapp import KMeansProcessor 
+from .settings_dialog import SettingsDialog  # Import the settings dialog
 from .shp_select import Ui_Dialog as ShpSelect
 
 # COLO_CRS = "EPSG:6430"
 
 # Ensure OSGeo4W QGIS path loaded first
-import sys
 sys.path.insert(0, r'C:\PROGRA~1\QGIS33~1.10\apps\Python312\Lib\site-packages')
 
 
@@ -52,7 +52,8 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 console_handler.setFormatter(formatter)
 
 # Add console handler to logger
-logger.addHandler(console_handler)
+if not logger.hasHandlers:
+    logger.addHandler(console_handler)
 
 
 class TreebeardDialog(treebeardDialog):
@@ -438,28 +439,83 @@ class TreebeardDialog(treebeardDialog):
             
             # Update progress and call the generate_binary_gdf_ndvi function
             ui.progress_state.setText("Generating NDVI-based binary GeoDataFrame...")
+            logger.debug("Starting NDVI-based binary GeoDataFrame generation.")
             QApplication.processEvents()
-            dissolved_gdf = processor.generate_binary_gdf_ndvi(tilepath, 
-                                                               n_clusters=2, 
-                                                               plot_segments=False)
-            ui.progressBar.setValue(70)
+            dissolved_gdf = processor.generate_binary_gdf_ndvi(tilepath, n_clusters=2, plot_segments=False)
+            ui.progressBar.setValue(30)
+            logger.debug("NDVI-based binary GeoDataFrame generated.")
+            QApplication.processEvents()
+            
+            # Convert multipolygons to polygons
+            ui.progress_state.setText("Converting multipolygons to polygons...")
+            logger.debug("Converting multipolygons to polygons.")
+            QApplication.processEvents()
+            polygons_gdf = processor.multipolygons_to_polygons(dissolved_gdf)
+            ui.progressBar.setValue(50)
+            logger.debug("Multipolygons converted to polygons.")
+            QApplication.processEvents()
+
+            # Calculate areas
+            ui.progress_state.setText("Calculating areas for polygons...")
+            logger.debug("Calculating areas for polygons.")
+            QApplication.processEvents()
+            polygons_gdf = processor.calculate_area(polygons_gdf)
+            ui.progressBar.setValue(60)
+            logger.debug("Areas calculated for polygons.")
+            QApplication.processEvents()
+
+            # Create dataframes for open space and canopy
+            logger.debug("Splitting polygons into open space and canopy categories.")
+            openspace_gdf = polygons_gdf[polygons_gdf['class'] == 0]
+            canopy_gdf = polygons_gdf[polygons_gdf['class'] == 1]
+
+            # Apply buffer to canopy and clip by bounds
+            bounds_gdf = processor.get_bounds_gdf(tilepath)
+            ui.progress_state.setText("Applying buffer to canopy polygons...")
+            logger.debug("Applying buffer to canopy polygons.")
+            QApplication.processEvents()
+            buffer_size = 5  # Example buffer size in feet, can be parameterized
+            b_canopy_gdf, _ = processor.apply_buffer(canopy_gdf, bounds_gdf, buffer_size)
+            ui.progressBar.setValue(80)
+            logger.debug("Buffer applied to canopy polygons.")
+            QApplication.processEvents()
+
+            # Reproject and crop the buffered polygons to match the AOI
+            ui.progress_state.setText("Reprojecting and cropping to AOI...")
+            logger.debug("Reprojecting and cropping buffered polygons to match AOI.")
+            QApplication.processEvents()
+            aoi_gdf = self.set_proj_area_gdf(self.proj_area_poly) 
+            aoi_gdf_6428 = aoi_gdf.to_crs(b_canopy_gdf.crs)
+            b_canopy_gdf = gpd.overlay(b_canopy_gdf, aoi_gdf_6428, how='intersection')
+            logger.debug("Reprojecting and intersection with AOI completed.")
+            
+            # Convert final multipolygons to polygons
+            final_openspace_gdf = processor.classless_multipolygons_to_polygons(b_canopy_gdf)
+            final_openspace_gdf = processor.calculate_area(final_openspace_gdf)
+            ui.progressBar.setValue(90)
+            logger.debug("Final conversion to individual polygons completed.")
+            QApplication.processEvents()
 
             # Save the output shapefile
             output_shapefile = os.path.join(self.output_dir, "kmeans_output.shp")
-            dissolved_gdf.to_file(output_shapefile)
+            final_openspace_gdf.to_file(output_shapefile)
             ui.progress_state.setText(f"K-means processing completed. Output saved to {output_shapefile}")
             ui.progressBar.setValue(100)
+            logger.info(f"K-means processing completed. Output saved to {output_shapefile}")
             QApplication.processEvents()
 
         except Exception as e:
-            logger.error("An error occurred during K-means processing.", exc_info=True)
+            logger.error(f"An error occurred during K-means processing: {e}", exc_info=True)
             QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
+            ui.progress_state.setText("Error occurred during K-means processing.")
 
         finally:
-            progress_dialog.accept()
+            progress_dialog.close()
 
-    
-    def calculate_spatial_statistics(self, gdf):
+
+
+        
+    def calculate_spatial_stats(self, gdf):
         stats = gdf['geometry'].area.describe()
         print("Spatial Statistics:")
         print(stats)
@@ -483,6 +539,21 @@ class Treebeard:
             callback=self.run,
             parent=self.iface.mainWindow()
         )
+
+                # Add settings button to the toolbar
+        self.add_action(
+            icon_path,
+            text=self.tr(u"Settings"),
+            callback=self.open_settings_dialog,
+            parent=self.iface.mainWindow(),
+        )
+
+    def open_settings_dialog(self):
+        """Open the settings dialog and update settings."""
+        dialog = SettingsDialog()
+        if dialog.exec_():  # If the user clicks "OK"
+            self.settings = dialog.get_settings()
+            print(f"Updated settings: {self.settings}")  # Debug log
 
     def add_action(self, icon_path, text, callback, enabled_flag=True, add_to_menu=True, add_to_toolbar=True, status_tip=None, whats_this=None, parent=None):
         icon = QIcon(icon_path)

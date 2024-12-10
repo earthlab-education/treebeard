@@ -124,3 +124,120 @@ class KMeansProcessor():
         buffered_gdf = gpd.GeoDataFrame(geometry=canopy_buffer, crs=canopy_gdf.crs)
         canopy_buffer_clipped = gpd.clip(buffered_gdf, bounds_gdf)
         return canopy_buffer_clipped, None  # Return clipped buffered polygons
+
+
+    def multipolygons_to_polygons(self, dissolved_gdf):
+        polygons = []
+        classes = []
+        for idx, row in dissolved_gdf.iterrows():
+            if isinstance(row.geometry, MultiPolygon):
+                for poly in row.geometry.geoms:  # Corrected line
+                    polygons.append(poly)
+                    classes.append(row['class'])
+            else:
+                polygons.append(row.geometry)
+                classes.append(row['class'])
+        return gpd.GeoDataFrame({'geometry': polygons, 'class': classes}, crs=dissolved_gdf.crs)
+
+
+    def classless_multipolygons_to_polygons(self, gdf):
+        polygons = []
+        for idx, row in gdf.iterrows():
+            if isinstance(row.geometry, MultiPolygon):
+                for poly in row.geometry.geoms:
+                    polygons.append(poly)
+            else:
+                polygons.append(row.geometry)
+        return gpd.GeoDataFrame({'geometry': polygons}, crs=gdf.crs)
+    
+    def calculate_area(self, gdf):
+        gdf['area_feet'] = gdf.geometry.area
+        gdf['area_acres'] = gdf['area_feet'] / 43560
+        return gdf
+
+
+    # Function to bin and plot the areas
+    def save_bin_plot(self, gdf, bins, labels, title, filepath=None, save_png_file=False):
+        gdf['bin'] = pd.cut(gdf['area_acres'], bins=bins, labels=labels, right=False)
+        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+
+        # Remove axis labels, ticks, and tick labels
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.tick_params(axis='both', which='both', length=0)
+
+        plot = gdf.plot(column='bin', ax=ax, legend=True, categorical=True, legend_kwds={'title': 'Size Category'})
+        # plot = gdf.plot(column='bin', ax=ax, legend=True, categorical=True, 
+        #                 legend_kwds={'title': 'Size Category'}, edgecolor='black')
+        ax.set_title(title)
+        plt.tight_layout()
+        filename = title.split('.')[0]
+        plt.savefig(f'{filename}.png')
+
+        if save_png_file:
+            plt.savefig(filepath)
+        
+        plt.show()
+
+
+    def plot_gdf(self, gdf, title, filepath=None, save_png_file=False):
+        fig, ax = plt.subplots(figsize=(10, 10))
+        # Remove axis labels, ticks, and tick labels
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.tick_params(axis='both', which='both', length=0)
+        gdf.plot(ax=ax, color='lightblue', edgecolor='black')
+        plt.title(title)
+
+        if save_png_file:
+            plt.savefig(filepath)
+
+        plt.show()
+
+
+    def get_bounds_gdf(self, geotiff_path):
+        tile = rasterio.open(geotiff_path)
+        bounds = tile.bounds
+        minx, miny, maxx, maxy = bounds
+        bounds_poly = Polygon([(minx, miny), (minx, maxy), (maxx, maxy), (maxx, miny)])
+        gdf = gpd.GeoDataFrame(geometry=[bounds_poly], crs=tile.crs)
+        return gdf
+
+
+    def apply_buffer(self, canopy_gdf, bounds_gdf, buffer_size=5):
+        """
+        Creates two GeoDataFrames: one for buffered canopy polygons and one for open space polygons.
+
+        Parameters:
+        - canopy_gdf: GeoDataFrame containing canopy polygons.
+        - bounds_gdf: GeoDataFrame containing the bounds to clip the buffered canopy polygons.
+        - buffer_size: The size of the buffer to apply to the canopy polygons (default is 5 feet).
+
+        Returns:
+        - buffered_gdf: GeoDataFrame containing buffered canopy polygons.
+        - openspace_gdf: GeoDataFrame containing open space polygons.
+        """
+
+        # Buffer the canopy polygons by the specified buffer size
+        canopy_buffer = canopy_gdf.buffer(buffer_size)
+
+        # Create a GeoDataFrame from the buffered canopy polygons
+        buffered_gdf = gpd.GeoDataFrame(geometry=canopy_buffer, crs=canopy_gdf.crs)
+
+        # Clip the buffered canopy polygons to the original bounds
+        canopy_buffer_clipped = gpd.clip(buffered_gdf, bounds_gdf)
+
+        # Create a unary union of the clipped buffer polygons
+        buffer_union = unary_union(canopy_buffer_clipped.geometry)
+
+        # Invert the buffer to get the open space polygons
+        openspace_polygons = bounds_gdf.geometry.difference(buffer_union)
+
+        # Create a GeoDataFrame for the open space polygons
+        openspace_gdf = gpd.GeoDataFrame(geometry=openspace_polygons, crs=bounds_gdf.crs)
+
+        return buffered_gdf, openspace_gdf
