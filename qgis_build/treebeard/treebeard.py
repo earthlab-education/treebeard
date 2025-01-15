@@ -9,7 +9,7 @@ import numpy as np
 from qgis.PyQt.QtWidgets import QApplication, QFileDialog, QDialog, QAction, QMessageBox, QInputDialog
 from qgis.PyQt.QtGui import QIcon
 from PyQt5.QtWidgets import QDialog, QDialogButtonBox,  QLabel,  QListWidget, QListWidgetItem, QMessageBox, QVBoxLayout
-from qgis.core import QgsProject, QgsRasterLayer, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry
+from qgis.core import QgsProject, QgsRasterLayer, QgsVectorLayer, QgsField, QgsFeature, QgsGeometry, QgsWkbTypes
 from PyQt5 import QtCore, QtGui, QtWidgets 
 from PyQt5.QtCore import Qt,  QVariant, QCoreApplication
 import requests
@@ -155,7 +155,46 @@ class TreebeardDialog(treebeardDialog):
         selection = ui.importLidarComboBox.currentText()
         
         if selection == "Import from QGIS Layer":
-            self.lidar_path = self.import_from_qgis_layer()
+            # Create a simple dialog to select a LiDAR layer
+            select_dialog = QDialog(self)
+            select_dialog.setWindowTitle("Select QGIS LiDAR Layer")
+            
+            layout = QVBoxLayout(select_dialog)
+            label = QLabel("Select a LiDAR layer from the loaded QGIS layers:", select_dialog)
+            layout.addWidget(label)
+
+            # Create a list widget to show available LiDAR layers
+            layer_list_widget = QListWidget(select_dialog)
+            layout.addWidget(layer_list_widget)
+
+            # Populate the list widget with available LiDAR (vector) layers
+            layers = QgsProject.instance().mapLayers().values()
+            for layer in layers:
+                # Filter layers to include only vector layers that are likely LiDAR data
+                if isinstance(layer, QgsVectorLayer) and layer.geometryType() == QgsWkbTypes.PointGeometry:
+                    layer_list_widget.addItem(layer.name())
+
+            # Create OK and Cancel buttons
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, select_dialog)
+            layout.addWidget(button_box)
+
+            # Handle button clicks
+            button_box.accepted.connect(select_dialog.accept)
+            button_box.rejected.connect(select_dialog.reject)
+
+            # Show the dialog and get the result
+            if select_dialog.exec_() == QDialog.Accepted:
+                selected_items = layer_list_widget.selectedItems()
+                if selected_items:
+                    selected_layer_name = selected_items[0].text()
+                    selected_layer = QgsProject.instance().mapLayersByName(selected_layer_name)
+                    if selected_layer:
+                        self.lidar_path = selected_layer[0].source()
+                    else:
+                        QMessageBox.critical(self, "Error", "Selected layer not found.")
+                else:
+                    QMessageBox.critical(self, "Error", "No layer selected.")
+
         
         elif selection == "Import from Desktop":
             # Prompt user to select a LiDAR file
