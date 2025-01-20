@@ -481,10 +481,21 @@ class TreebeardDialog(treebeardDialog):
     def process_kmeans(self):
         """Run K-means processing on aerial photography or GeoTIFF raster file."""
         
+         # Validate raster input
         tilepath = self.raster_path
-        if tilepath is None:
-            logger.error("No Aerial Photography file selected.")
-            QMessageBox.critical(self, "Error", "Please select aerial photograph or GeoTIFF raster file.")
+        if not tilepath:
+            logger.error("No raster file selected.")
+            QMessageBox.critical(self, "Error", "No raster file selected. Please load a GeoTIFF file before running K-means processing.")
+            return
+
+        if not os.path.exists(tilepath):
+            logger.error(f"Raster file not found: {tilepath}")
+            QMessageBox.critical(self, "Error", f"Raster file not found: {tilepath}. Please check the file path and try again.")
+            return
+
+        if not tilepath.lower().endswith('.tif'):
+            logger.error(f"Invalid file format: {tilepath}")
+            QMessageBox.critical(self, "Error", "Invalid file format. Please select a GeoTIFF (.tif) file.")
             return
 
         # Initialize Progress Dialog
