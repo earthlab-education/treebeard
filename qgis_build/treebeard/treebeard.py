@@ -28,7 +28,7 @@ from .import_raster_dialog import Ui_import_raster_dialog as ImportRasterDialog
 from .progress_dialog import Ui_Dialog as ProgressDialog
 from .process_lidar import  process_canopy_areas, process_lidar_to_canopy
 from .segment_drapp import KMeansProcessor 
-from .settings_dialog import SettingsDialog  # Import the settings dialog
+from .settings_dialog import Config_Dialog  # Import the settings dialog
 from .shp_select import Ui_Dialog as ShpSelect
 
 # COLO_CRS = "EPSG:6430"
@@ -66,10 +66,13 @@ class TreebeardDialog(treebeardDialog):
         self.browseLidarButton.clicked.connect(self.show_import_lidar_dialog)
         self.processCanopyButton.clicked.connect(self.process_lidar_data)
         self.browseOutputButton.clicked.connect(self.set_proj_dir)
+        self.settingsButton.clicked.connect(self.open_settings)
         self.raster_path = ""
         self.proj_area_poly = ""
         self.lidar_path = ""
         self.output_dir = ""
+        self.enable_buffer = False
+        self.create_pngs = False
 
     def set_proj_dir(self):
         """Sets folder for output files"""
@@ -261,7 +264,18 @@ class TreebeardDialog(treebeardDialog):
         if self.lidar_path:
             self.lidarLineEdit.setText(self.lidar_path)
 
+    def open_settings(self):
+        """Open the Settings dialog."""
+        settings_box = QDialog(self)
+        ui = Config_Dialog()
+        ui.setupUi(settings_box)
+
+        # Set initial values for checkboxes
+        ui.buffer_chkbox.setChecked(self.parent().enable_buffer)
+        ui.png_chkbox.setChecked(self.parent().create_pngs)
+
     def process_lidar_data(self):
+
         logger.info("Clicked on 'Process Canopy' button. Starting process_lidar_data...")
 
         lidar_file = self.lidar_path

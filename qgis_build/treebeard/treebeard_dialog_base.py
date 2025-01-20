@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_treebeardDialogBase(object):
     def setupUi(self, treebeardDialogBase):
         treebeardDialogBase.setObjectName("treebeardDialogBase")
-        treebeardDialogBase.resize(477, 252)
+        treebeardDialogBase.resize(496, 273)
         self.label = QtWidgets.QLabel(treebeardDialogBase)
         self.label.setGeometry(QtCore.QRect(10, 20, 141, 21))
         self.label.setObjectName("label")
@@ -34,7 +34,7 @@ class Ui_treebeardDialogBase(object):
         self.browseRasterButton.setGeometry(QtCore.QRect(370, 50, 93, 28))
         self.browseRasterButton.setObjectName("browseRasterButton")
         self.processButton = QtWidgets.QPushButton(treebeardDialogBase)
-        self.processButton.setGeometry(QtCore.QRect(50, 150, 161, 28))
+        self.processButton.setGeometry(QtCore.QRect(50, 150, 161, 31))
         self.processButton.setObjectName("processButton")
         self.lidarLineEdit = QtWidgets.QLineEdit(treebeardDialogBase)
         self.lidarLineEdit.setGeometry(QtCore.QRect(170, 80, 171, 21))
@@ -60,6 +60,9 @@ class Ui_treebeardDialogBase(object):
         self.browseOutputButton = QtWidgets.QPushButton(treebeardDialogBase)
         self.browseOutputButton.setGeometry(QtCore.QRect(370, 110, 93, 28))
         self.browseOutputButton.setObjectName("browseOutputButton")
+        self.configButton = QtWidgets.QPushButton(treebeardDialogBase)
+        self.configButton.setGeometry(QtCore.QRect(10, 230, 93, 28))
+        self.configButton.setObjectName("configButton")
 
         self.retranslateUi(treebeardDialogBase)
         QtCore.QMetaObject.connectSlotsByName(treebeardDialogBase)
@@ -78,3 +81,4 @@ class Ui_treebeardDialogBase(object):
         self.reportSpataialButton.setText(_translate("treebeardDialogBase", "Report Spatial Heterogeneity Sats"))
         self.label_4.setText(_translate("treebeardDialogBase", "Select Output Directory"))
         self.browseOutputButton.setText(_translate("treebeardDialogBase", "Browse"))
+        self.configButton.setText(_translate("treebeardDialogBase", "Config"))

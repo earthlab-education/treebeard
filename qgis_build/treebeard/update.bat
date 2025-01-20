@@ -8,7 +8,7 @@ set "PLUGIN_DIR=%USERPROFILE%\AppData\Roaming\QGIS\QGIS3\profiles\default\python
 if "%DEV_DIR:~-1%"=="\" set "DEV_DIR=%DEV_DIR:~0,-1%"
 
 REM List of files to sync
-set "FILES=treebeard.py icon-test1.png treebeard_dialog.py import_raster_dialog.py import_lidar_dialog.py __init__.py progress_dialog.py shp_select.py treebeard_dialog_base.ui setup.bat setup.sh resources.qrc update. process_lidar.py drapp.py segment_drapp.py"
+set "FILES=treebeard.py icon-test1.png treebeard_dialog.py import_raster_dialog.py import_lidar_dialog.py __init__.py progress_dialog.py shp_select.py treebeard_dialog_base.ui settings_dialog.py setup.bat setup.sh  resources.qrc update.bat process_lidar.py drapp.py segment_drapp.py"
 
 REM Debugging output to check paths and files
 echo Development Directory: %DEV_DIR%
