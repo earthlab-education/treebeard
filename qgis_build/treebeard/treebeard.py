@@ -485,7 +485,7 @@ class TreebeardDialog(treebeardDialog):
         tilepath = self.raster_path
         if not tilepath:
             logger.error("No raster file selected.")
-            QMessageBox.critical(self, "Error", "No raster file selected. Please load a GeoTIFF file before running K-means processing.")
+            QMessageBox.critical(self, "Error", "No aerial photography tile selected. Please load a GeoTIFF file before running K-means processing.")
             return
 
         if not os.path.exists(tilepath):
