@@ -66,7 +66,7 @@ class TreebeardDialog(treebeardDialog):
         self.browseLidarButton.clicked.connect(self.show_import_lidar_dialog)
         self.processCanopyButton.clicked.connect(self.process_lidar_data)
         self.browseOutputButton.clicked.connect(self.set_proj_dir)
-        self.settingsButton.clicked.connect(self.open_settings)
+        self.configButton.clicked.connect(self.open_settings)
         self.raster_path = ""
         self.proj_area_poly = ""
         self.lidar_path = ""
@@ -270,9 +270,19 @@ class TreebeardDialog(treebeardDialog):
         ui = Config_Dialog()
         ui.setupUi(settings_box)
 
-        # Set initial values for checkboxes
-        ui.buffer_chkbox.setChecked(self.parent().enable_buffer)
-        ui.png_chkbox.setChecked(self.parent().create_pngs)
+        # Set the initial checkbox values based on current global variables
+        ui.buffer_chkbox.setChecked(self.enable_buffer)
+        ui.png_chkbox.setChecked(self.create_pngs)
+
+        # Handle dialog acceptance
+        if settings_box.exec_() == QDialog.Accepted:
+            # Update global variables based on user input
+            self.enable_buffer = ui.buffer_chkbox.isChecked()
+            self.create_pngs = ui.png_chkbox.isChecked()
+
+            # Debugging log to confirm the update
+            logger.info(f"Updated settings: enable_buffer={self.enable_buffer}, create_pngs={self.create_pngs}")
+
 
     def process_lidar_data(self):
 
@@ -594,19 +604,6 @@ class Treebeard:
         )
 
                 # Add settings button to the toolbar
-        self.add_action(
-            icon_path,
-            text=self.tr(u"Settings"),
-            callback=self.open_settings_dialog,
-            parent=self.iface.mainWindow(),
-        )
-
-    def open_settings_dialog(self):
-        """Open the settings dialog and update settings."""
-        dialog = SettingsDialog()
-        if dialog.exec_():  # If the user clicks "OK"
-            self.settings = dialog.get_settings()
-            print(f"Updated settings: {self.settings}")  # Debug log
 
     def add_action(self, icon_path, text, callback, enabled_flag=True, add_to_menu=True, add_to_toolbar=True, status_tip=None, whats_this=None, parent=None):
         icon = QIcon(icon_path)
