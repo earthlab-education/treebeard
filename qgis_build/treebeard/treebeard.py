@@ -483,6 +483,13 @@ class TreebeardDialog(treebeardDialog):
         
          # Validate raster input
         tilepath = self.raster_path
+        kmeans_output =  os.path.join(self.output_dir, 'kmeans_output')
+        QUICKSHIFT_PATH = f"{kmeans_output}/quickshift.png"
+        SEGMENT_PATH = f"{kmeans_output}/segmented.png"
+        OPENSPACE_PATH = f"{kmeans_output}/openspace.png"
+        PREBUFFER_PATH = f"{kmeans_output}/prebuffer.png"
+        BUFFER_PATH = f"{kmeans_output}/buffer.png"
+        OUTPUT_PATH = f"{kmeans_output}/final_openspace.png"
         if not tilepath:
             logger.error("No raster file selected.")
             QMessageBox.critical(self, "Error", "No aerial photography tile selected. Please load a GeoTIFF file before running K-means processing.")
@@ -515,11 +522,24 @@ class TreebeardDialog(treebeardDialog):
             ui.progress_state.setText("Generating NDVI-based binary GeoDataFrame...")
             logger.debug("Starting NDVI-based binary GeoDataFrame generation.")
             QApplication.processEvents()
-            dissolved_gdf = processor.generate_binary_gdf_ndvi(tilepath, n_clusters=2, plot_segments=False)
-            ui.progressBar.setValue(30)
+            dissolved_gdf = processor.generate_binary_gdf_ndvi(tilepath,
+                                                                n_clusters=2,
+                                                                plot_segments=self.create_pngs,
+                                                                plot_path= QUICKSHIFT_PATH)
+            
+            ui.progressBar.setValue(20)
             logger.debug("NDVI-based binary GeoDataFrame generated.")
             QApplication.processEvents()
+
+            ui.progress_state.setText("Generating Plot of Study Area...")
+            logger.debug("Creating binary plot.")
+            QApplication.processEvents()
+
+            processor.plot_binary_gdf_ndvi(dissolved_gdf, filepath=,)
             
+             ui.progressBar.setValue(35)
+            logger.debug("NDVI-based binary GeoDataFrame generated.")
+            QApplication.processEvents()
             # Convert multipolygons to polygons
             ui.progress_state.setText("Converting multipolygons to polygons...")
             logger.debug("Converting multipolygons to polygons.")

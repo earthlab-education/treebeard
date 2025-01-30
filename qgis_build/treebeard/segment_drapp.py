@@ -97,6 +97,36 @@ class KMeansProcessor():
             print(f"Shapefile saved to {output_shapefile_path}")
 
         return dissolved_gdf
+    def plot_binary_gdf(self, dissolved_gdf, filepath=None, save_png_file=False):
+        """
+        Plots the binary GeoDataFrame showing classified clusters (Tree and Not Tree).
+
+        Parameters:
+        - dissolved_gdf (GeoDataFrame): The GeoDataFrame containing classified clusters.
+        - filepath (str): Path to save the plot (optional).
+        - save_png_file (bool): Whether to save the plot as a PNG file (default is False).
+        """
+        # Add a new column for categorical labels
+        dissolved_gdf['category'] = dissolved_gdf['class'].map({1: 'Tree', 0: 'Not Tree'})
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+        # Remove axis labels, ticks, and tick labels
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.tick_params(axis='both', which='both', length=0)
+
+        dissolved_gdf.plot(column='category',
+                        ax=ax, legend=True, cmap='viridis',
+                        legend_kwds={'title': "Class"})
+        plt.title("Classified Clusters (Tree and Not Tree)")
+
+        if save_png_file:
+            plt.savefig(filepath)
+
+        plt.show()
 
     def plot_segments(self, img, ndvi, segments, plot_path):
         """Plot and save segments, NDVI, and classified clusters."""
