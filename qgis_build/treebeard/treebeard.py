@@ -535,9 +535,9 @@ class TreebeardDialog(treebeardDialog):
             logger.debug("Creating binary plot.")
             QApplication.processEvents()
 
-            processor.plot_binary_gdf_ndvi(dissolved_gdf, filepath=,)
+            processor.plot_binary_gdf_ndvi(dissolved_gdf, kmeans_output, self.create_pngs )
             
-             ui.progressBar.setValue(35)
+            ui.progressBar.setValue(35)
             logger.debug("NDVI-based binary GeoDataFrame generated.")
             QApplication.processEvents()
             # Convert multipolygons to polygons
