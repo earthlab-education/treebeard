@@ -1,47 +1,46 @@
 @echo off
 setlocal
 
-REM Dynamically find the latest installed QGIS version
-for /d %%D in ("C:\Program Files\QGIS *") do set "QGIS_DIR=%%D"
+REM Set the QGIS directory and handle spaces by enclosing in double quotes
+set "QGIS_DIR=C:\Program Files\QGIS 3.34.10"
 
-REM Ensure that QGIS was found
-if not exist "%QGIS_DIR%" (
-    echo QGIS installation not found in C:\Program Files\
-    pause
-    exit /b 1
-)
+REM Add the QGIS bin and apps directories to the PATH for correct Python and QGIS dependencies
+set "PATH=%QGIS_DIR%\bin;%QGIS_DIR%\apps\Python312\Scripts;%QGIS_DIR%\apps\Python312\bin;%QGIS_DIR%\apps\qgis\bin;%QGIS_DIR%\apps\grass\bin;%PATH%"
 
-echo Using QGIS installation at: %QGIS_DIR%
-
-REM Define the OSGeo4W environment batch file
-set "OSGeo4W_SETUP=%QGIS_DIR%\OSGeo4W.bat"
+REM Define the OSGeo4W setup command with the correct path
+set OSGeo4W_SETUP=%QGIS_DIR%\osgeo4w.bat
 
 REM Ensure the OSGeo4W batch file exists
 if not exist "%OSGeo4W_SETUP%" (
-    echo OSGeo4W batch file not found at %OSGeo4W_SETUP%
+    echo "OSGeo4W batch file not found at %OSGeo4W_SETUP%"
     pause
     exit /b 1
 )
 
-REM Start a new shell using OSGeo4W.bat so the environment persists
-call "%OSGeo4W_SETUP%"
-if errorlevel 1 (
-    echo Failed to set up OSGeo4W environment
-    pause
-    exit /b 1
-)
+REM Remove the user site-packages directory from PYTHONPATH
+set "PYTHONNOUSERSITE=1"
 
-REM Install Python packages in that environment
-python3 -m pip install --upgrade pip
+echo Uninstalling numpy...
+call "%OSGeo4W_SETUP%" ^
+python3 -m pip uninstall -y numpy
+
+echo Installing numpy version 1.26.4...
+call "%OSGeo4W_SETUP%" ^
+python3 -m pip install numpy==1.26.4
+
+echo Installing other dependencies...
+call "%OSGeo4W_SETUP%" ^
 python3 -m pip install --force-reinstall rioxarray rasterio geopandas shapely scipy whitebox scikit-learn fiona pyogrio laspy earthpy tqdm
 
+echo Verifying package installation...
+call "%OSGeo4W_SETUP%" ^
+python3 -c "import numpy, rioxarray, rasterio, geopandas, shapely; print('Packages installed correctly, numpy version:', numpy.__version__)"
+
 if errorlevel 1 (
-    echo Error occurred during the installation of packages.
+    echo "Error occurred during the installation of packages."
     pause
     exit /b 1
 )
-
-python3 -c "import rioxarray, rasterio, geopandas, shapely; print('Packages installed correctly')"
 
 echo Restart QGIS to see the changes.
 pause
