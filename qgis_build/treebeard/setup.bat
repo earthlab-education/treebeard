@@ -1,47 +1,85 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
-REM Set the QGIS directory and handle spaces by enclosing in double quotes
-set "QGIS_DIR=C:\Program Files\QGIS 3.34.10"
+REM === Automatically find QGIS installation ===
+for /f "delims=" %%D in ('dir "C:\Program Files\QGIS*" /ad /b /o-n') do (
+    set "QGIS_DIR=C:\Program Files\%%D"
+    goto found_qgis
+)
 
-REM Add the QGIS bin and apps directories to the PATH for correct Python and QGIS dependencies
+echo QGIS installation not found in C:\Program Files\QGIS*
+pause
+exit /b 1
+
+:found_qgis
+echo Using QGIS installation at: "%QGIS_DIR%"
+
+REM === Set PATH and environment variables ===
 set "PATH=%QGIS_DIR%\bin;%QGIS_DIR%\apps\Python312\Scripts;%QGIS_DIR%\apps\Python312\bin;%QGIS_DIR%\apps\qgis\bin;%QGIS_DIR%\apps\grass\bin;%PATH%"
+set "PYTHONNOUSERSITE=1"
+set "OSGeo4W_SETUP=%QGIS_DIR%\osgeo4w.bat"
 
-REM Define the OSGeo4W setup command with the correct path
-set OSGeo4W_SETUP=%QGIS_DIR%\osgeo4w.bat
-
-REM Ensure the OSGeo4W batch file exists
+REM === Confirm OSGeo4W batch file exists ===
 if not exist "%OSGeo4W_SETUP%" (
-    echo "OSGeo4W batch file not found at %OSGeo4W_SETUP%"
+    echo OSGeo4W batch file not found at %OSGeo4W_SETUP%
     pause
     exit /b 1
 )
 
-REM Remove the user site-packages directory from PYTHONPATH
-set "PYTHONNOUSERSITE=1"
+REM === Clean user site-packages that may conflict ===
+echo Cleaning user site-packages...
+rmdir /s /q "%APPDATA%\Python\Python312\site-packages\numpy" 2>nul
+rmdir /s /q "%APPDATA%\Python\Python312\site-packages\numpy-*" 2>nul
+rmdir /s /q "%APPDATA%\Python\Python312\site-packages\xarray" 2>nul
+rmdir /s /q "%APPDATA%\Python\Python312\site-packages\rioxarray" 2>nul
 
-echo Uninstalling numpy...
+echo.
+echo Uninstalling existing numpy...
 call "%OSGeo4W_SETUP%" ^
-python3 -m pip uninstall -y numpy
+    python3 -m pip uninstall -y numpy
 
-echo Installing numpy version 1.26.4...
+echo.
+echo Installing numpy==1.26.4...
 call "%OSGeo4W_SETUP%" ^
-python3 -m pip install numpy==1.26.4
+    python3 -m pip install --no-cache-dir numpy==1.26.4
 
-echo Installing other dependencies...
+echo.
+echo Uninstalling existing xarray...
 call "%OSGeo4W_SETUP%" ^
-python3 -m pip install --force-reinstall rioxarray rasterio geopandas shapely scipy whitebox scikit-learn fiona pyogrio laspy earthpy tqdm
+    python3 -m pip uninstall -y xarray
 
-echo Verifying package installation...
+echo.
+echo Installing xarray==2024.2.0...
 call "%OSGeo4W_SETUP%" ^
-python3 -c "import numpy, rioxarray, rasterio, geopandas, shapely; print('Packages installed correctly, numpy version:', numpy.__version__)"
+    python3 -m pip install --no-cache-dir xarray==2024.2.0
+
+echo.
+echo Uninstalling rioxarray and rasterio...
+call "%OSGeo4W_SETUP%" ^
+    python3 -m pip uninstall -y rioxarray rasterio
+
+echo.
+echo Installing rioxarray and rasterio...
+call "%OSGeo4W_SETUP%" ^
+    python3 -m pip install --no-cache-dir --force-reinstall rioxarray rasterio
+
+echo.
+echo Installing additional dependencies...
+call "%OSGeo4W_SETUP%" ^
+    python3 -m pip install --no-cache-dir --force-reinstall geopandas shapely scipy whitebox scikit-learn fiona pyogrio laspy earthpy tqdm
+
+echo.
+echo Verifying installed packages...
+call "%OSGeo4W_SETUP%" ^
+    python3 -c "import numpy, xarray, rioxarray, rasterio, geopandas, shapely; print('✅ Packages installed. numpy:', numpy.__version__, '| xarray:', xarray.__version__, '| rioxarray:', rioxarray.__version__, '| rasterio:', rasterio.__version__)"
 
 if errorlevel 1 (
-    echo "Error occurred during the installation of packages."
+    echo ❌ Error occurred during the installation of packages.
     pause
     exit /b 1
 )
 
-echo Restart QGIS to see the changes.
+echo All packages installed successfully. ✅
+echo Please restart QGIS to apply changes.
 pause
 endlocal
