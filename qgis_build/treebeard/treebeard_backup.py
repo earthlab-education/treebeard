@@ -42,7 +42,7 @@ logger = logging.getLogger('qgis_plugin')
 logger.setLevel(logging.DEBUG)  # Set to the lowest level to capture all logs
 
 # Create console handler and set level to debug
-console_handler = logging.StreamHandler(sys.stdout)  # sys.stdout ensures it goes to Python Console
+console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 
 # Create formatter
@@ -51,8 +51,8 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 # Add formatter to console handler
 console_handler.setFormatter(formatter)
 
-# Add console handler to logger if none exist
-if not logger.hasHandlers(): 
+# Add console handler to logger
+if not logger.hasHandlers:
     logger.addHandler(console_handler)
 
 
@@ -525,18 +525,17 @@ class TreebeardDialog(treebeardDialog):
             dissolved_gdf = processor.generate_binary_gdf_ndvi(tilepath,
                                                                 n_clusters=2,
                                                                 plot_segments=self.create_pngs,
-                                                                plot_path= QUICKSHIFT_PATH
-                                                                )
+                                                                plot_path= QUICKSHIFT_PATH)
             
             ui.progressBar.setValue(20)
             logger.debug("NDVI-based binary GeoDataFrame generated.")
             QApplication.processEvents()
 
-            # ui.progress_state.setText("Generating Plot of Study Area...")
-            # logger.debug("Creating binary plot.")
-            # QApplication.processEvents()
+            ui.progress_state.setText("Generating Plot of Study Area...")
+            logger.debug("Creating binary plot.")
+            QApplication.processEvents()
 
-            #processor.plot_binary_gdf_ndvi(dissolved_gdf, kmeans_output, self.create_pngs )
+            processor.plot_binary_gdf_ndvi(dissolved_gdf, kmeans_output, self.create_pngs )
             
             ui.progressBar.setValue(35)
             logger.debug("NDVI-based binary GeoDataFrame generated.")
@@ -550,70 +549,54 @@ class TreebeardDialog(treebeardDialog):
             logger.debug("Multipolygons converted to polygons.")
             QApplication.processEvents()
 
-            # # Calculate areas
-            # ui.progress_state.setText("Calculating areas for polygons...")
-            # logger.debug("Calculating areas for polygons.")
-            # QApplication.processEvents()
-            # polygons_gdf = processor.calculate_area(polygons_gdf)
-            # ui.progressBar.setValue(60)
-            # logger.debug("Areas calculated for polygons.")
-            # QApplication.processEvents()
+            # Calculate areas
+            ui.progress_state.setText("Calculating areas for polygons...")
+            logger.debug("Calculating areas for polygons.")
+            QApplication.processEvents()
+            polygons_gdf = processor.calculate_area(polygons_gdf)
+            ui.progressBar.setValue(60)
+            logger.debug("Areas calculated for polygons.")
+            QApplication.processEvents()
 
             # Create dataframes for open space and canopy
             logger.debug("Splitting polygons into open space and canopy categories.")
-            output_path = os.path.join(self.output_dir, "imagery_canopy_output")
-            if not os.path.exists(output_path):
-                os.makedirs(output_path)
             openspace_gdf = polygons_gdf[polygons_gdf['class'] == 0]
             canopy_gdf = polygons_gdf[polygons_gdf['class'] == 1]
 
-            study_area = gpd.read_file(self.proj_area_poly)
-            processor.process_canopy_areas_imagery(
-                canopy_gdf=canopy_gdf,
-                proj_area_name=os.path.basename(self.output_dir),
-                study_area=study_area,
-                output_path=output_path,
-                buffer_distance=5
-            )
-                        
-            # Show a dialog to let the user choose which shapefiles to load
-            shapefiles = [os.path.join(output_path, f) for f in os.listdir(output_path) if f.endswith('.shp')]
-            selected_shapefiles = self.show_shp_files(shapefiles)
+            # Apply buffer to canopy and clip by bounds
+            bounds_gdf = processor.get_bounds_gdf(tilepath)
+            ui.progress_state.setText("Applying buffer to canopy polygons...")
+            logger.debug("Applying buffer to canopy polygons.")
+            QApplication.processEvents()
+            buffer_size = 5  # Example buffer size in feet, can be parameterized
+            b_canopy_gdf, _ = processor.apply_buffer(canopy_gdf, bounds_gdf, buffer_size)
+            ui.progressBar.setValue(80)
+            logger.debug("Buffer applied to canopy polygons.")
+            QApplication.processEvents()
 
-            # # Apply buffer to canopy and clip by bounds
-            # bounds_gdf = processor.get_bounds_gdf(tilepath)
-            # ui.progress_state.setText("Applying buffer to canopy polygons...")
-            # logger.debug("Applying buffer to canopy polygons.")
-            # QApplication.processEvents()
-            # buffer_size = 5  # Example buffer size in feet, can be parameterized
-            # b_canopy_gdf, _ = processor.apply_buffer(canopy_gdf, bounds_gdf, buffer_size)
-            # ui.progressBar.setValue(80)
-            # logger.debug("Buffer applied to canopy polygons.")
-            # QApplication.processEvents()
-
-            # # Reproject and crop the buffered polygons to match the AOI
-            # ui.progress_state.setText("Reprojecting and cropping to AOI...")
-            # logger.debug("Reprojecting and cropping buffered polygons to match AOI.")
-            # QApplication.processEvents()
-            # aoi_gdf = self.set_proj_area_gdf(self.proj_area_poly) 
-            # aoi_gdf_6428 = aoi_gdf.to_crs(b_canopy_gdf.crs)
-            # b_canopy_gdf = gpd.overlay(b_canopy_gdf, aoi_gdf_6428, how='intersection')
-            # logger.debug("Reprojecting and intersection with AOI completed.")
+            # Reproject and crop the buffered polygons to match the AOI
+            ui.progress_state.setText("Reprojecting and cropping to AOI...")
+            logger.debug("Reprojecting and cropping buffered polygons to match AOI.")
+            QApplication.processEvents()
+            aoi_gdf = self.set_proj_area_gdf(self.proj_area_poly) 
+            aoi_gdf_6428 = aoi_gdf.to_crs(b_canopy_gdf.crs)
+            b_canopy_gdf = gpd.overlay(b_canopy_gdf, aoi_gdf_6428, how='intersection')
+            logger.debug("Reprojecting and intersection with AOI completed.")
             
-            # # Convert final multipolygons to polygons
-            # final_openspace_gdf = processor.classless_multipolygons_to_polygons(b_canopy_gdf)
-            # final_openspace_gdf = processor.calculate_area(final_openspace_gdf)
-            # ui.progressBar.setValue(90)
-            # logger.debug("Final conversion to individual polygons completed.")
-            # QApplication.processEvents()
+            # Convert final multipolygons to polygons
+            final_openspace_gdf = processor.classless_multipolygons_to_polygons(b_canopy_gdf)
+            final_openspace_gdf = processor.calculate_area(final_openspace_gdf)
+            ui.progressBar.setValue(90)
+            logger.debug("Final conversion to individual polygons completed.")
+            QApplication.processEvents()
 
-            # # Save the output shapefile
-            # output_shapefile = os.path.join(self.output_dir, "kmeans_output.shp")
-            # final_openspace_gdf.to_file(output_shapefile)
-            # ui.progress_state.setText(f"K-means processing completed. Output saved to {output_shapefile}")
-            # ui.progressBar.setValue(100)
-            # logger.info(f"K-means processing completed. Output saved to {output_shapefile}")
-            # QApplication.processEvents()
+            # Save the output shapefile
+            output_shapefile = os.path.join(self.output_dir, "kmeans_output.shp")
+            final_openspace_gdf.to_file(output_shapefile)
+            ui.progress_state.setText(f"K-means processing completed. Output saved to {output_shapefile}")
+            ui.progressBar.setValue(100)
+            logger.info(f"K-means processing completed. Output saved to {output_shapefile}")
+            QApplication.processEvents()
 
         except Exception as e:
             logger.error(f"An error occurred during K-means processing: {e}", exc_info=True)

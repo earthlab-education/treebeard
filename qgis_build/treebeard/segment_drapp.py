@@ -16,87 +16,92 @@ import os
 class KMeansProcessor():
     
     def generate_binary_gdf_ndvi(self, tilepath,
-                                  n_clusters=2, 
-                                  plot_segments=False, 
-                                  plot_path=None, 
-                                  output_shapefile_path=None, 
-                                  apply_buffering=False, buffer_size=5):
-        """Generates a segmented K-Means polygon and optionally applies buffering."""
+                                n_clusters=2, 
+                                plot_segments=False, 
+                                plot_path=None, 
+                                output_shapefile_path=None, 
+                                apply_buffering=False, buffer_size=5):
+        """Generates a segmented K-Means polygon from NDVI, classifies it, and optionally buffers and saves it."""
 
-        # Load the image and bands
+        import pandas as pd
+        from sklearn.cluster import KMeans
+        from rasterio.features import shapes
+        from skimage.segmentation import quickshift
+        from skimage import io
+        import earthpy.spatial as es
+        from tqdm import tqdm
+        import rasterio
+
+            # Load the image and bands
         tile = rasterio.open(tilepath)
         red = tile.read(1).astype(float)
         nir = tile.read(4).astype(float)
-
-        # Get image bounding box info
-        sr = tile.crs
         affine = tile.transform
+        sr = tile.crs
 
-        # Compute NDVI
+        # Compute NDVI and handle NaNs
         ndvi = es.normalized_diff(nir, red)
         ndvi = np.where(np.isnan(ndvi), 0, ndvi)
 
-        # Segment the NDVI image using quickshift
+        # Segment NDVI using quickshift
         img = io.imread(tilepath)
         img_ndvi = np.expand_dims(ndvi, axis=2).astype(np.float32)
-        segments = quickshift(img_ndvi, 
-                              kernel_size=3, 
-                              convert2lab=False, 
-                              max_dist=6, 
-                              ratio=0.5).astype('int32')
+        segments = quickshift(img_ndvi, kernel_size=3, convert2lab=False, max_dist=6, ratio=0.5).astype('int32')
         
-        print("Quickshift number of segments: %d" % len(np.unique(segments)))
+        print(f"Quickshift number of segments: {len(np.unique(segments))}")
 
+        # Optional: save segment image
         if plot_segments and plot_path:
-            # Plot and save segments
             self.plot_segments(img, ndvi, segments, plot_path)
 
-        # Convert segments to vector features
-        polys = [shape(shp) for shp, value in tqdm(shapes(segments, transform=affine), 
-                                                   desc="Converting segments to vector features")]
+        # Efficient mean NDVI calculation per segment using vectorized grouping
+        flat_segments = segments.flatten()
+        flat_ndvi = ndvi.flatten()
+        import pandas as pd
+        df = pd.DataFrame({'segment': flat_segments, 'ndvi': flat_ndvi})
+        mean_ndvi_per_segment = df.groupby('segment')['ndvi'].mean()
 
-        # Compute mean NDVI for each segment
-        mean_ndvi_vals = np.array([ndvi[rasterio.features.geometry_mask([shp], 
-                                                                        transform=affine, 
-                                                                        invert=True, 
-                                                                        out_shape=ndvi.shape)]
-                                                                        .mean() 
-                                                                        for shp in polys]).reshape(-1, 1)
+        # Convert segments to polygons
+        polys = []
+        segment_ids = []
+        for shp, val in tqdm(shapes(segments, transform=affine), desc="Converting segments to vector features"):
+            polys.append(shape(shp))
+            segment_ids.append(val)
 
-        # Apply K-Means clustering
+        # Create GeoDataFrame with geometry and segment ID
+        gdf = gpd.GeoDataFrame({'geometry': polys, 'segment': segment_ids}, crs=sr)
+
+        # Map mean NDVI values to each polygon using segment ID
+        gdf['mean_ndvi'] = gdf['segment'].map(mean_ndvi_per_segment)
+
+        # KMeans clustering based on mean NDVI per polygon
+        from sklearn.cluster import KMeans
+        mean_ndvi_vals = gdf['mean_ndvi'].values.reshape(-1, 1)
         kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(mean_ndvi_vals)
-        labels = kmeans.labels_
+        gdf['cluster'] = kmeans.labels_
 
-        # Create GeoDataFrame with segments and their cluster labels
-        gdf = gpd.GeoDataFrame({'geometry': polys, 'cluster': labels}, crs=sr)
+        # Determine which cluster is 'tree' (highest mean NDVI)
+        cluster_means = [mean_ndvi_vals[gdf['cluster'] == i].mean() for i in range(n_clusters)]
+        tree_cluster_idx = np.argmax(cluster_means)
 
-        # Determine which cluster corresponds to 'tree' based on NDVI values
-        cluster_mean_ndvi = [mean_ndvi_vals[labels == i].mean() for i in range(n_clusters)]
-        tree_cluster_idx = np.argmax(cluster_mean_ndvi)
+        # Assign class labels: 1 = tree/canopy, 0 = open space
         gdf['class'] = gdf['cluster'].apply(lambda x: 1 if x == tree_cluster_idx else 0)
 
-        # Dissolve polygons by 'class' to merge connected polygons
-        dissolved_gdfs = []
-        for cls in tqdm(gdf['class'].unique(), desc="Dissolving polygons by class"):
-            class_gdf = gdf[gdf['class'] == cls]
-            dissolved_gdf = class_gdf.dissolve()
-            dissolved_gdf['class'] = cls
-            dissolved_gdfs.append(dissolved_gdf)
+        # Dissolve polygons by class to merge connected polygons
+        dissolved_gdf = gdf.dissolve(by='class', as_index=False)
 
-        # Combine the dissolved GeoDataFrames
-        dissolved_gdf = gpd.GeoDataFrame(pd.concat(dissolved_gdfs, ignore_index=True), crs=sr)
-
+        # Optional buffering
         if apply_buffering:
-            # Apply buffering if requested
             bounds_gdf = self.get_bounds_gdf(tilepath)
             dissolved_gdf, _ = self.apply_buffer(dissolved_gdf, bounds_gdf, buffer_size)
 
+        # Optional save to shapefile
         if output_shapefile_path:
-            # Save the GeoDataFrame as a shapefile
             dissolved_gdf.to_file(output_shapefile_path, driver="ESRI Shapefile")
             print(f"Shapefile saved to {output_shapefile_path}")
 
         return dissolved_gdf
+    
     def plot_binary_gdf(self, dissolved_gdf, filepath=None, save_png_file=False):
         """
         Plots the binary GeoDataFrame showing classified clusters (Tree and Not Tree).
@@ -181,10 +186,27 @@ class KMeansProcessor():
         return gpd.GeoDataFrame({'geometry': polygons}, crs=gdf.crs)
     
     def calculate_area(self, gdf):
+        # Calculate area in square feet and acres
         gdf['area_feet'] = gdf.geometry.area
         gdf['area_acres'] = gdf['area_feet'] / 43560
-        return gdf
 
+        # Define a function to categorize the gap size
+        def categorize_gap_size(acres):
+            if acres < 1/8:
+                return '< 1/8 acre'
+            elif 1/8 <= acres < 1/4:
+                return '1/8 - 1/4 acre'
+            elif 1/4 <= acres < 1/2:
+                return '1/4 - 1/2 acre'
+            elif 1/2 <= acres < 1:
+                return '1/2 - 1 acre'
+            else:
+                return '> 1 acre'
+
+        # Apply the categorization function to the 'area_acres' column
+        gdf['gap_size_category'] = gdf['area_acres'].apply(categorize_gap_size)
+
+        return gdf
 
     # Function to bin and plot the areas
     def save_bin_plot(self, gdf, bins, labels, title, filepath=None, save_png_file=False):
@@ -271,3 +293,85 @@ class KMeansProcessor():
         openspace_gdf = gpd.GeoDataFrame(geometry=openspace_polygons, crs=bounds_gdf.crs)
 
         return buffered_gdf, openspace_gdf
+    
+    def process_canopy_areas_imagery(self, canopy_gdf, proj_area_name, study_area, output_path, buffer_distance=5):
+        """
+        Processes canopy areas by buffering, dissolving, clipping, and exploding the geometries.
+        Adds acreage and size category columns.
+
+        Parameters
+        ----------
+        canopy_gdf : gpd.GeoDataFrame
+            GeoDataFrame representing canopy areas.
+        study_area : gpd.GeoDataFrame
+            GeoDataFrame representing the boundary within which to clip the canopy areas.
+        output_path : path
+            File path to output processed shapefiles
+        buffer_distance : float, optional
+            The distance to buffer the canopy geometries. Default is 5 units.
+
+        Returns
+        -------
+        clipped_buffer : gpd.GeoDataFrame
+            GeoDataFrame with the buffered and clipped canopy areas.
+        exploded_gap_gdf : gpd.GeoDataFrame
+            GeoDataFrame with exploded geometries representing non-tree canopy areas, including acreage and size category.
+        """
+        # Ensure study area CRS is the same as the processed canopy CRS (should be in Feet)
+        study_area = study_area.to_crs(canopy_gdf.crs)
+
+        # Ensure input GeoDataFrames have CRS
+        if canopy_gdf.crs is None or study_area.crs is None:
+            raise ValueError("Input GeoDataFrames must have a CRS defined.")
+
+        # Buffer the canopy geometries
+        buffered_canopy = canopy_gdf.geometry.buffer(buffer_distance)
+
+        # Create a new GeoDataFrame with the buffered geometries
+        buffer_gdf = gpd.GeoDataFrame(geometry=buffered_canopy, crs=canopy_gdf.crs)
+
+        # Dissolve the buffered geometries into a single MultiPolygon
+        dissolved_canopy = unary_union(buffer_gdf.geometry)
+
+        # Convert the dissolved canopy back to a GeoDataFrame
+        dissolved_canopy_gdf = gpd.GeoDataFrame(geometry=[dissolved_canopy], crs=canopy_gdf.crs)
+
+        # Clip the dissolved canopy with the study area
+        clipped_buffer = gpd.overlay(dissolved_canopy_gdf, study_area, how='intersection')
+
+        # Calculate the difference between the study area and the clipped buffer
+        non_tree_canopy_gdf = gpd.overlay(study_area, clipped_buffer, how='difference')
+
+        # Explode multipart polygon to prepare for area calculations
+        exploded_gap_gdf = non_tree_canopy_gdf.explode(index_parts=True)
+
+        # Reset the index to have a clean DataFrame
+        exploded_gap_gdf.reset_index(drop=True, inplace=True)
+
+        # Calculate the area in acres (1 acre = 43,560 square feet)
+        exploded_gap_gdf['Acreage'] = exploded_gap_gdf.geometry.area / 43560
+
+        # Define a function to categorize the gap size
+        def categorize_gap_size(acres):
+            if acres < 1/8:
+                return '< 1/8 acre'
+            elif 1/8 <= acres < 1/4:
+                return '1/8 - 1/4 acre'
+            elif 1/4 <= acres < 1/2:
+                return '1/4 - 1/2 acre'
+            elif 1/2 <= acres < 1:
+                return '1/2 - 1 acre'
+            else:
+                return '> 1 acre'
+
+        # Apply the categorization function to the Acreage column
+        exploded_gap_gdf['Gap_Size_Category'] = exploded_gap_gdf['Acreage'].apply(categorize_gap_size)
+
+        # Output shapefiles
+
+        canopy_gaps_calced_path = os.path.join(output_path,'imagery_'+ proj_area_name + '_canopy_gaps_calced.shp')
+        exploded_gap_gdf.to_file(canopy_gaps_calced_path)
+        dissolved_canopy_path = os.path.join(output_path, 'imagery_'+ proj_area_name + '_canopy.shp')
+        canopy_gdf.to_file(dissolved_canopy_path)
+        buffered_canopy_path = os.path.join(output_path,'imagery_'+ proj_area_name + '_buffered_canopy.shp')
+        clipped_buffer.to_file(buffered_canopy_path)
